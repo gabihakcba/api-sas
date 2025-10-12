@@ -1,0 +1,7 @@
+export const RAMAS = {
+  CASTORES: 'CASTORES',
+  MANADA: 'MANADA',
+  UNIDAD: 'UNIDAD',
+  CAMINANTES: 'CAMINANTES',
+  ROVER: 'ROVER',
+};
