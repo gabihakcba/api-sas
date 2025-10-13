@@ -4,6 +4,7 @@ import { UpdateCuentaDto } from './dto/update-cuenta.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ErrorManager } from '../utils/error.manager';
 import * as bcrypt from 'bcrypt';
+import { AuthAccountContext } from 'src/auth/interfaces/auth-account-context.interface';
 
 @Injectable()
 export class CuentaService {
@@ -89,6 +90,85 @@ export class CuentaService {
         error instanceof Error ? error.message : 'Error desconocido';
       throw ErrorManager.createSignatureError(message);
     }
+  }
+
+  async buildAuthAccountContext(
+    id: number,
+  ): Promise<AuthAccountContext | null> {
+    const cuenta = await this.prismaService.cuenta.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        Miembro: {
+          select: {
+            id: true,
+            Protagonista: {
+              select: {
+                id: true,
+              },
+            },
+            Responsable: {
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!cuenta) {
+      return null;
+    }
+
+    const dependents: AuthAccountContext['dependents'] = [];
+    const responsableId = cuenta.Miembro?.Responsable?.id;
+
+    if (typeof responsableId === 'number') {
+      const responsabilidades =
+        await this.prismaService.responsabilidad.findMany({
+          where: { id_responsable: responsableId },
+          select: {
+            Protagonista: {
+              select: {
+                id: true,
+                Miembro: {
+                  select: {
+                    id: true,
+                    id_cuenta: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+      for (const responsabilidad of responsabilidades) {
+        const protagonista = responsabilidad.Protagonista;
+        const miembro = protagonista?.Miembro;
+
+        if (
+          protagonista &&
+          miembro &&
+          typeof miembro.id === 'number' &&
+          typeof miembro.id_cuenta === 'number'
+        ) {
+          dependents.push({
+            cuentaId: miembro.id_cuenta,
+            miembroId: miembro.id,
+            protagonistaId: protagonista.id,
+          });
+        }
+      }
+    }
+
+    return {
+      cuentaId: cuenta.id,
+      miembroId: cuenta.Miembro?.id ?? undefined,
+      protagonistaId: cuenta.Miembro?.Protagonista?.id ?? undefined,
+      responsableId: responsableId ?? undefined,
+      dependents,
+    };
   }
 
   async findByUser(user: string, withPassword: boolean) {
