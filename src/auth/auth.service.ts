@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { CuentaService } from '../cuenta/cuenta.service';
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
+import { AuthTokenPayload } from './interfaces/auth-token-payload.interface';
 
 @Injectable()
 export class AuthService {
@@ -99,14 +100,11 @@ export class AuthService {
 
   public async refreshTokens(refreshToken: string) {
     const payload = this.useToken(refreshToken, this.getRefreshSecret());
-    if (!payload || typeof payload === 'string') {
+    if (typeof payload === 'string') {
       throw new UnauthorizedException('Token de refresco inválido');
     }
 
-    const { sub } = payload as jwt.JwtPayload & { sub?: number };
-    if (typeof sub !== 'number') {
-      throw new UnauthorizedException('Token de refresco inválido');
-    }
+    const { sub } = payload;
 
     const cuenta = await this.cuentaService.findById(sub);
     return this.buildTokens(cuenta);
@@ -115,12 +113,32 @@ export class AuthService {
   public useToken(
     token: string,
     secret: string = process.env.JWT_SECRET as string,
-  ) {
+  ): AuthTokenPayload | string {
     try {
-      const decoded = jwt.verify(token, secret) as
-        | string
-        | ({ sub: number; roles: string[] } & jwt.JwtPayload);
-      return decoded;
+      const decoded = jwt.verify(token, secret);
+
+      if (typeof decoded === 'string') {
+        return decoded;
+      }
+
+      const { sub, roles } = decoded as jwt.JwtPayload & {
+        sub?: unknown;
+        roles?: unknown;
+      };
+
+      if (typeof sub !== 'number' || !Array.isArray(roles)) {
+        throw new UnauthorizedException('Token inválido: payload inesperado');
+      }
+
+      const validatedRoles = roles.filter((role): role is string => {
+        return typeof role === 'string';
+      });
+
+      if (validatedRoles.length !== roles.length) {
+        throw new UnauthorizedException('Token inválido: payload inesperado');
+      }
+
+      return { ...decoded, sub, roles: validatedRoles } as AuthTokenPayload;
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
         throw new UnauthorizedException(
