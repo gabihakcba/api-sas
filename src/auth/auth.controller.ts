@@ -1,6 +1,7 @@
 import { Body, Controller, Post, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { Public } from './decorators/public.decorator';
 
 @Controller('auth')
@@ -17,5 +18,12 @@ export class AuthController {
     }
     const jwt = await this.authService.generateJwt(user);
     return jwt;
+  }
+
+  @Public()
+  @Post('refresh')
+  async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
+    const { refreshToken } = refreshTokenDto;
+    return this.authService.refreshTokens(refreshToken);
   }
 }
