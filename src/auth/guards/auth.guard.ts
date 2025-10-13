@@ -109,7 +109,7 @@ export class AuthGuard implements CanActivate {
     }
 
     const rawAccountContext = await this.cuentaService.buildAuthAccountContext(
-      manageToken.sub,
+      Number(manageToken.sub),
     );
 
     if (

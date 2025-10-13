@@ -61,10 +61,11 @@ export class CuentaService {
     }
   }
 
-  async findById(id: number) {
+  async findById(id: number | string) {
+    const Id = id as number;
     try {
       const cuenta = await this.prismaService.cuenta.findUnique({
-        where: { id },
+        where: { id: Id },
         select: {
           id: true,
           user: true,
