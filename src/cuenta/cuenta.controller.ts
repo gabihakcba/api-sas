@@ -15,9 +15,10 @@ import { Roles } from 'src/auth/decorators/roles.decorator';
 import { ROLES } from 'src/constans/db/roles';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Ownership } from 'src/auth/decorators/ownership.decorator';
+import { AuthGuard } from 'src/auth/guards/auth.guard';
 
 @Controller('cuenta')
-@UseGuards(RolesGuard)
+@UseGuards(AuthGuard, RolesGuard)
 export class CuentaController {
   constructor(private readonly cuentaService: CuentaService) {}
 
