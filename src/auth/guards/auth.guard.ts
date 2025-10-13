@@ -9,7 +9,47 @@ import { Request } from 'express';
 import { CuentaService } from 'src/cuenta/cuenta.service';
 import { AuthService } from '../auth.service';
 import { PUBLICK_KEY } from 'src/constans/key-decorators';
-import { AuthAccountContext } from '../interfaces/auth-account-context.interface';
+import {
+  AuthAccountContext,
+  DependentAccessContext,
+} from '../interfaces/auth-account-context.interface';
+
+const isDependentAccessContext = (
+  value: unknown,
+): value is DependentAccessContext => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const { cuentaId, miembroId, protagonistaId } = value as Record<
+    string,
+    unknown
+  >;
+
+  return (
+    typeof cuentaId === 'number' &&
+    typeof miembroId === 'number' &&
+    (protagonistaId === undefined || typeof protagonistaId === 'number')
+  );
+};
+
+const isAuthAccountContext = (value: unknown): value is AuthAccountContext => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const { cuentaId, miembroId, protagonistaId, responsableId, dependents } =
+    value as Record<string, unknown>;
+
+  return (
+    typeof cuentaId === 'number' &&
+    (miembroId === undefined || typeof miembroId === 'number') &&
+    (protagonistaId === undefined || typeof protagonistaId === 'number') &&
+    (responsableId === undefined || typeof responsableId === 'number') &&
+    Array.isArray(dependents) &&
+    dependents.every(isDependentAccessContext)
+  );
+};
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -68,8 +108,20 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException(`Cuenta no encontrada: [${String(sub)}]`);
     }
 
-    const accountContext: AuthAccountContext | null =
-      await this.cuentaService.buildAuthAccountContext(manageToken.sub);
+    const rawAccountContext = await this.cuentaService.buildAuthAccountContext(
+      manageToken.sub,
+    );
+
+    if (
+      rawAccountContext !== null &&
+      !isAuthAccountContext(rawAccountContext)
+    ) {
+      throw new UnauthorizedException(
+        'Token inválido: contexto de cuenta inesperado',
+      );
+    }
+
+    const accountContext: AuthAccountContext | null = rawAccountContext;
 
     request['id'] = manageToken.sub;
     request['roles'] = manageToken.roles;
