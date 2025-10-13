@@ -12,7 +12,7 @@ export class RolesGuard implements CanActivate {
     private readonly reflector: Reflector,
   ) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
+  canActivate(context: ExecutionContext): boolean {
     /**
      * Obtengo los roles requeridos
      */

@@ -70,6 +70,11 @@ export class CuentaService {
           borrado: true,
           createdAt: true,
           updatedAt: true,
+          CuentaRole: {
+            include: {
+              Role: true,
+            },
+          },
         },
       });
       if (!cuenta) {
@@ -96,10 +101,21 @@ export class CuentaService {
           borrado: true,
           createdAt: true,
           updatedAt: true,
-          password: withPassword,
+          ...(withPassword ? { password: true } : {}),
+          Miembro: {
+            select: {
+              nombre: true,
+              apellidos: true,
+              dni: true,
+            },
+          },
           CuentaRole: {
-            include: {
-              Role: true,
+            select: {
+              // si querés todos los campos de CuentaRole, listalos; ejemplo:
+              id: true,
+              id_cuenta: true,
+              id_role: true,
+              Role: true, // todos los campos de Role
             },
           },
         },
