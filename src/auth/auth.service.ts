@@ -33,18 +33,10 @@ export class AuthService {
       return jwt.sign(payload, secret, {
         expiresIn,
       });
-    } catch (error: unknown) {
-      let reason: string;
-
-      if (error instanceof Error) {
-        reason = error.message;
-      } else if (typeof error === 'object' && error !== null) {
-        reason = JSON.stringify(error as Record<string, unknown>);
-      } else {
-        reason = String(error);
-      }
-
-      throw new Error(`JWT signing failed: ${reason}`);
+    } catch (error: any) {
+      throw new Error(
+        `JWT signing failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
