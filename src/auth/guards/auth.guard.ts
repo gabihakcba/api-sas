@@ -9,6 +9,7 @@ import { Request } from 'express';
 import { CuentaService } from 'src/cuenta/cuenta.service';
 import { AuthService } from '../auth.service';
 import { PUBLICK_KEY } from 'src/constans/key-decorators';
+import { AuthAccountContext } from '../interfaces/auth-account-context.interface';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -64,11 +65,15 @@ export class AuthGuard implements CanActivate {
 
     // Cuenta no encontrada
     if (!cuenta) {
-      throw new UnauthorizedException(`Cuenta no encontrada: [${sub}]`);
+      throw new UnauthorizedException(`Cuenta no encontrada: [${String(sub)}]`);
     }
+
+    const accountContext: AuthAccountContext | null =
+      await this.cuentaService.buildAuthAccountContext(manageToken.sub);
 
     request['id'] = manageToken.sub;
     request['roles'] = manageToken.roles;
+    request['accountContext'] = accountContext ?? undefined;
 
     return true;
   }

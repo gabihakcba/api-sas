@@ -14,6 +14,7 @@ import { UpdateCuentaDto } from './dto/update-cuenta.dto';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { ROLES } from 'src/constans/db/roles';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Ownership } from 'src/auth/decorators/ownership.decorator';
 
 @Controller('cuenta')
 @UseGuards(RolesGuard)
@@ -32,17 +33,22 @@ export class CuentaController {
     return this.cuentaService.findAll();
   }
 
-  @Roles(ROLES.SELF)
+  @Roles(ROLES.SELF, ROLES.RESPONSABLE)
+  @Ownership({ entity: 'cuenta', param: 'id' })
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.cuentaService.findById(+id);
   }
 
+  @Roles(ROLES.SELF, ROLES.RESPONSABLE)
+  @Ownership({ entity: 'cuenta', param: 'id' })
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateCuentaDto: UpdateCuentaDto) {
     return this.cuentaService.update(+id, updateCuentaDto);
   }
 
+  @Roles(ROLES.SELF, ROLES.RESPONSABLE)
+  @Ownership({ entity: 'cuenta', param: 'id' })
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.cuentaService.remove(+id);
