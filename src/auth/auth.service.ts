@@ -69,7 +69,7 @@ export class AuthService {
       access_token: this.signJwt({
         payload: payload as unknown as jwt.JwtPayload,
         secret: process.env.JWT_SECRET as string,
-        expiresIn: '1d',
+        expiresIn: '30d',
       }),
       refresh_token: this.signJwt({
         payload: payload as unknown as jwt.JwtPayload,
@@ -112,7 +112,10 @@ export class AuthService {
     return this.buildTokens(cuenta);
   }
 
-  public useToken(token: string, secret: string = process.env.JWT_SECRET as string) {
+  public useToken(
+    token: string,
+    secret: string = process.env.JWT_SECRET as string,
+  ) {
     try {
       const decoded = jwt.verify(token, secret) as
         | string
