@@ -7,6 +7,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from 'src/auth/guards/auth.guard';
+import { MiembroModule } from './miembro/miembro.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { AuthGuard } from 'src/auth/guards/auth.guard';
     CuentaModule,
     PrismaModule,
     AuthModule,
+    MiembroModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: AuthGuard }],
