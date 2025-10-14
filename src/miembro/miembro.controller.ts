@@ -18,7 +18,7 @@ import { UpdateMiembroDto } from './dto/update-miembro.dto';
 import { MiembroService } from './miembro.service';
 import { MiembroWithCuenta } from './types/miembro-with-cuenta.type';
 
-@Controller('miembro')
+@Controller('miembros')
 @UseGuards(AuthGuard, RolesGuard)
 export class MiembroController {
   constructor(private readonly miembroService: MiembroService) {}
