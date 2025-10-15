@@ -1,15 +1,23 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { CuentaService } from '../cuenta/cuenta.service';
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
 import { AuthTokenPayload } from './interfaces/auth-token-payload.interface';
+import { CuentaService } from '../cuenta/cuenta.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly cuentaService: CuentaService) {}
+  constructor(
+    private readonly cuentaService: CuentaService,
+    private readonly prismaService: PrismaService,
+  ) {}
 
   public async validateUser(user: string, password: string) {
-    const cuenta = await this.cuentaService.findByUser(user, true);
+    const cuenta = await this.cuentaService.findByUser(
+      this.prismaService,
+      user,
+      true,
+    );
     if (cuenta) {
       const isMatch = await bcrypt.compare(password, cuenta.password);
       if (isMatch) {
@@ -82,7 +90,11 @@ export class AuthService {
   }
 
   public async generateJwt(user: string) {
-    const cuenta = (await this.cuentaService.findByUser(user, false)) as {
+    const cuenta = (await this.cuentaService.findByUser(
+      this.prismaService,
+      user,
+      false,
+    )) as {
       id: number;
       user: string;
       CuentaRole: Array<{
@@ -105,8 +117,13 @@ export class AuthService {
     }
 
     const { sub } = payload;
+    const cuentaId = Number(sub);
 
-    const cuenta = await this.cuentaService.findById(sub);
+    if (!Number.isFinite(cuentaId)) {
+      throw new UnauthorizedException('Token de refresco inválido: sub inesperado');
+    }
+
+    const cuenta = await this.cuentaService.findById(this.prismaService, cuentaId);
     return this.buildTokens(cuenta);
   }
 

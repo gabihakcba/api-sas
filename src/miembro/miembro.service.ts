@@ -58,60 +58,62 @@ export class MiembroService {
         cualidad,
       } = createMiembroDto;
 
-      const nuevaCuenta = await this.cuentaService.create(cuenta);
+      const miembro = await this.prismaService.$transaction(async (prisma) => {
+        const nuevaCuenta = await this.cuentaService.create(prisma, cuenta);
 
-      const miembro = await this.prismaService.miembro.create({
-        data: {
-          nombre,
-          apellidos,
-          dni,
-          fecha_nacimiento: new Date(fecha_nacimiento),
-          direccion,
-          email,
-          telefono,
-          telefono_emergencia,
-          totem,
-          cualidad,
-          Cuenta: {
-            connect: {
-              id: nuevaCuenta?.id,
+        return prisma.miembro.create({
+          data: {
+            nombre,
+            apellidos,
+            dni,
+            fecha_nacimiento: new Date(fecha_nacimiento),
+            direccion,
+            email,
+            telefono,
+            telefono_emergencia,
+            totem,
+            cualidad,
+            Cuenta: {
+              connect: {
+                id: nuevaCuenta.id,
+              },
             },
           },
-        },
-        select: {
-          id: true,
-          nombre: true,
-          apellidos: true,
-          dni: true,
-          fecha_nacimiento: true,
-          direccion: true,
-          email: true,
-          telefono: true,
-          telefono_emergencia: true,
-          totem: true,
-          cualidad: true,
-          borrado: true,
-          createdAt: true,
-          updatedAt: true,
-          Cuenta: {
-            select: {
-              id: true,
-              user: true,
-              borrado: true,
-              createdAt: true,
-              updatedAt: true,
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+            dni: true,
+            fecha_nacimiento: true,
+            direccion: true,
+            email: true,
+            telefono: true,
+            telefono_emergencia: true,
+            totem: true,
+            cualidad: true,
+            borrado: true,
+            createdAt: true,
+            updatedAt: true,
+            Cuenta: {
+              select: {
+                id: true,
+                user: true,
+                borrado: true,
+                createdAt: true,
+                updatedAt: true,
+              },
             },
-          },
-          MiembroRama: {
-            include: {
-              Rama: {
-                select: {
-                  nombre: true,
+            MiembroRama: {
+              include: {
+                Rama: {
+                  select: {
+                    nombre: true,
+                  },
                 },
               },
             },
           },
-        },
+        });
       });
 
       return miembro;
