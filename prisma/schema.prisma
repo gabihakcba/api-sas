@@ -375,7 +375,7 @@ model InscripcionEvento {
 /**
  * Tablas para manejo de pagos
  * @Pago
- * @TipoPago
+ * @ConceptoPago
  * @MetodoPago
  * @CuentaDinero
  */
@@ -398,12 +398,12 @@ model Pago {
   // Foreign key relations
   CuentaDinero CuentaDinero @relation(fields: [id_cuenta_dinero], references: [id], name: "PagoCuentaDinero")
   MetodoPago   MetodoPago   @relation(fields: [id_metodo_pago], references: [id], name: "PagoMetodoPago")
-  TipoPago     TipoPago     @relation(fields: [id_tipo_pago], references: [id], name: "PagoTipoPago")
+  ConceptoPago ConceptoPago @relation(fields: [id_tipo_pago], references: [id], name: "PagoConceptoPago")
   Evento       Evento?      @relation(fields: [id_evento], references: [id], name: "PagoEvento")
   Miembro      Miembro      @relation(fields: [id_miembro], references: [id], name: "PagoMiembro")
 }
 
-model TipoPago {
+model ConceptoPago {
   id          Int     @id @default(autoincrement())
   nombre      String // Afiliacion - Cuota - Evento
   descripcion String?
@@ -413,7 +413,7 @@ model TipoPago {
   updatedAt DateTime @updatedAt
 
   // Relations
-  Pago Pago[] @relation(name: "PagoTipoPago")
+  Pago Pago[] @relation(name: "PagoConceptoPago")
 }
 
 model MetodoPago {
@@ -611,7 +611,7 @@ model Action {
  */
 model Role {
   id          Int     @id @default(autoincrement())
-  nombre      String  @unique // ADM - DEV - OWN - 
+  nombre      String  @unique // ADM - DEV - OWN
   descripcion String?
 
   // Relations
@@ -619,18 +619,47 @@ model Role {
   CuentaRole     CuentaRole[]
 }
 
+enum ACTION {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  MANAGE
+}
+
+enum RESOURCE {
+  CUENTA
+  MIEMBRO
+  PROTAGONISTA
+  ADULTO
+  RESPONSABLE
+  PAGO
+}
+
 model Permission {
-  id          Int     @id @default(autoincrement())
-  nombre      String  @unique
-  descripcion String?
+  id       Int      @id @default(autoincrement())
+  action   ACTION   @unique
+  resource RESOURCE
 
   // Relations
   Roles RolePermission[]
+
+  @@unique([action, resource])
+}
+
+enum SCOPE {
+  GRUPO
+  RAMA
+  GLOBAL
+  OWN
 }
 
 model RolePermission {
   id_role       Int
   id_permission Int
+
+  tipo_scoup SCOPE
+  id_scope   Int? // FK a rama si aplica
 
   // Foreign key relations
   Role       Role       @relation(fields: [id_role], references: [id])

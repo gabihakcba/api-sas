@@ -7,6 +7,7 @@ import { ErrorManager } from 'src/utils/error.manager';
 import { CreateMiembroDto } from './dto/create-miembro.dto';
 import { UpdateMiembroDto } from './dto/update-miembro.dto';
 import { MiembroWithCuenta } from './types/miembro-with-cuenta.type';
+import { CuentaService } from 'src/cuenta/cuenta.service';
 
 @Injectable()
 export class MiembroService {
@@ -36,7 +37,10 @@ export class MiembroService {
     },
   };
 
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly cuentaService: CuentaService,
+  ) {}
 
   async create(createMiembroDto: CreateMiembroDto): Promise<MiembroWithCuenta> {
     try {
@@ -54,10 +58,7 @@ export class MiembroService {
         cualidad,
       } = createMiembroDto;
 
-      const hashedPassword = await bcrypt.hash(
-        cuenta.password,
-        Number(process.env.HASH_SALT),
-      );
+      const nuevaCuenta = await this.cuentaService.create(cuenta);
 
       const miembro = await this.prismaService.miembro.create({
         data: {
@@ -72,9 +73,8 @@ export class MiembroService {
           totem,
           cualidad,
           Cuenta: {
-            create: {
-              user: cuenta.user,
-              password: hashedPassword,
+            connect: {
+              id: nuevaCuenta?.id,
             },
           },
         },
@@ -100,6 +100,15 @@ export class MiembroService {
               borrado: true,
               createdAt: true,
               updatedAt: true,
+            },
+          },
+          MiembroRama: {
+            include: {
+              Rama: {
+                select: {
+                  nombre: true,
+                },
+              },
             },
           },
         },

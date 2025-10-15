@@ -19,7 +19,6 @@ export class CuentaService {
       );
       const cuenta = await this.prismaService.cuenta.create({
         data: { user, password: hashedPassword },
-        // no devolver password
         select: {
           id: true,
           user: true,
