@@ -6,13 +6,14 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { CuentaService } from 'src/cuenta/cuenta.service';
-import { AuthService } from '../auth.service';
 import { PUBLICK_KEY } from 'src/constans/key-decorators';
 import {
   AuthAccountContext,
   DependentAccessContext,
 } from '../interfaces/auth-account-context.interface';
+import { CuentaService } from 'src/cuenta/cuenta.service';
+import { AuthService } from '../auth.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 const isDependentAccessContext = (
   value: unknown,
@@ -56,6 +57,7 @@ export class AuthGuard implements CanActivate {
   constructor(
     private readonly authService: AuthService,
     private readonly cuentaService: CuentaService,
+    private readonly prismaService: PrismaService,
     private readonly reflector: Reflector,
   ) {}
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -101,7 +103,13 @@ export class AuthGuard implements CanActivate {
      * Chequeo de cuenta valida
      */
     const { sub } = manageToken;
-    const cuenta = await this.cuentaService.findById(sub);
+    const cuentaId = Number(sub);
+
+    if (!Number.isFinite(cuentaId)) {
+      throw new UnauthorizedException('Token inválido: identificador inesperado');
+    }
+
+    const cuenta = await this.cuentaService.findById(this.prismaService, cuentaId);
 
     // Cuenta no encontrada
     if (!cuenta) {
@@ -109,7 +117,8 @@ export class AuthGuard implements CanActivate {
     }
 
     const rawAccountContext = await this.cuentaService.buildAuthAccountContext(
-      Number(manageToken.sub),
+      this.prismaService,
+      cuentaId,
     );
 
     if (
