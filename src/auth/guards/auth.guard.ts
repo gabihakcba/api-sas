@@ -106,10 +106,15 @@ export class AuthGuard implements CanActivate {
     const cuentaId = Number(sub);
 
     if (!Number.isFinite(cuentaId)) {
-      throw new UnauthorizedException('Token inválido: identificador inesperado');
+      throw new UnauthorizedException(
+        'Token inválido: identificador inesperado',
+      );
     }
 
-    const cuenta = await this.cuentaService.findById(this.prismaService, cuentaId);
+    const cuenta = await this.cuentaService.findById(
+      this.prismaService,
+      cuentaId,
+    );
 
     // Cuenta no encontrada
     if (!cuenta) {
