@@ -6,8 +6,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { ErrorManager } from 'src/utils/error.manager';
 import { CreateMiembroDto } from './dto/create-miembro.dto';
 import { UpdateMiembroDto } from './dto/update-miembro.dto';
-import { MiembroWithCuenta } from './types/miembro-with-cuenta.type';
 import { CuentaService } from 'src/cuenta/cuenta.service';
+type Tx = Prisma.TransactionClient;
 
 @Injectable()
 export class MiembroService {
@@ -42,99 +42,86 @@ export class MiembroService {
     private readonly cuentaService: CuentaService,
   ) {}
 
-  async create(createMiembroDto: CreateMiembroDto): Promise<MiembroWithCuenta> {
-    try {
-      const {
-        cuenta,
-        nombre,
-        apellidos,
-        dni,
-        fecha_nacimiento,
-        direccion,
-        email,
-        telefono,
-        telefono_emergencia,
-        totem,
-        cualidad,
-      } = createMiembroDto;
+  async create(createMiembroDto: CreateMiembroDto): Promise<any> {
+    // NO atrapes dentro si no vas a re-lanzar
+    const miembro = await this.prismaService.$transaction(async (tx: Tx) => {
+      // 1) separo la parte de cuenta del resto
+      const { cuenta, fecha_nacimiento, id_rama, ...miembroInput } =
+        createMiembroDto;
 
-      const miembro = await this.prismaService.$transaction(async (prisma) => {
-        const nuevaCuenta = await this.cuentaService.create(prisma, cuenta);
+      // 2) creo la cuenta con el MISMO tx
+      const nuevaCuenta = await this.cuentaService.create(tx, cuenta);
 
-        return prisma.miembro.create({
-          data: {
-            nombre,
-            apellidos,
-            dni,
-            fecha_nacimiento: new Date(fecha_nacimiento),
-            direccion,
-            email,
-            telefono,
-            telefono_emergencia,
-            totem,
-            cualidad,
-            Cuenta: {
-              connect: {
-                id: nuevaCuenta.id,
-              },
+      // 3) creo el miembro con data explícito (sin `cuenta`)
+      const created = await tx.miembro.create({
+        data: {
+          ...miembroInput, // solo campos reales del modelo Miembro
+          fecha_nacimiento: new Date(fecha_nacimiento),
+          Cuenta: { connect: { id: nuevaCuenta.id } },
+          MiembroRama: { create: { id_rama } },
+        },
+        select: {
+          id: true,
+          nombre: true,
+          apellidos: true,
+          dni: true,
+          fecha_nacimiento: true,
+          direccion: true,
+          email: true,
+          telefono: true,
+          telefono_emergencia: true,
+          totem: true,
+          cualidad: true,
+          borrado: true,
+          createdAt: true,
+          updatedAt: true,
+          Cuenta: {
+            select: {
+              id: true,
+              user: true,
+              borrado: true,
+              createdAt: true,
+              updatedAt: true,
             },
           },
-          select: {
-            id: true,
-            nombre: true,
-            apellidos: true,
-            dni: true,
-            fecha_nacimiento: true,
-            direccion: true,
-            email: true,
-            telefono: true,
-            telefono_emergencia: true,
-            totem: true,
-            cualidad: true,
-            borrado: true,
-            createdAt: true,
-            updatedAt: true,
-            Cuenta: {
-              select: {
-                id: true,
-                user: true,
-                borrado: true,
-                createdAt: true,
-                updatedAt: true,
-              },
-            },
-            MiembroRama: {
-              include: {
-                Rama: {
-                  select: {
-                    nombre: true,
-                  },
-                },
-              },
-            },
+          MiembroRama: {
+            include: { Rama: { select: { nombre: true } } },
           },
-        });
+        },
       });
 
-      return miembro;
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Error desconocido';
-      throw ErrorManager.createSignatureError(message);
-    }
+      return created;
+    });
+
+    const parsed = {
+      ...miembro,
+      rama: miembro.MiembroRama?.Rama?.nombre,
+    };
+
+    return parsed;
   }
 
-  async findAll(): Promise<MiembroWithCuenta[]> {
+  async findAll(): Promise<any> {
     try {
-      return await this.prismaService.miembro.findMany({
+      const miembros = await this.prismaService.miembro.findMany({
         where: {
           borrado: false,
           Cuenta: {
             is: { borrado: false },
           },
         },
-        select: this.miembroSelect,
+        select: {
+          ...this.miembroSelect,
+          MiembroRama: { select: { Rama: true } },
+        },
       });
+      const parsed = miembros.map((m) => {
+        return {
+          ...m,
+          rama: m.MiembroRama?.Rama?.nombre,
+        };
+      });
+      return parsed;
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : 'Error desconocido';
@@ -142,7 +129,7 @@ export class MiembroService {
     }
   }
 
-  async findOne(id: number): Promise<MiembroWithCuenta> {
+  async findOne(id: number): Promise<any> {
     try {
       const miembro = await this.prismaService.miembro.findFirst({
         where: {
@@ -170,10 +157,7 @@ export class MiembroService {
     }
   }
 
-  async update(
-    id: number,
-    updateMiembroDto: UpdateMiembroDto,
-  ): Promise<MiembroWithCuenta> {
+  async update(id: number, updateMiembroDto: UpdateMiembroDto): Promise<any> {
     try {
       const exists = await this.prismaService.miembro.findFirst({
         where: { id, borrado: false },
@@ -232,7 +216,7 @@ export class MiembroService {
     }
   }
 
-  async remove(id: number): Promise<MiembroWithCuenta> {
+  async remove(id: number): Promise<any> {
     try {
       const exists = await this.prismaService.miembro.findFirst({
         where: { id, borrado: false },

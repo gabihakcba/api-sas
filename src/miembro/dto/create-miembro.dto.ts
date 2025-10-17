@@ -2,6 +2,7 @@ import {
   IsDateString,
   IsEmail,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   ValidateNested,
@@ -54,4 +55,9 @@ export class CreateMiembroDto {
   @ValidateNested()
   @Type(() => CreateCuentaDto)
   cuenta: CreateCuentaDto;
+
+  @IsNotEmpty()
+  @Type(() => Number)
+  @IsNumber()
+  id_rama: number;
 }

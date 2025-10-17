@@ -16,7 +16,9 @@ const cuentaSummarySelect = {
   updatedAt: true,
 } as const;
 
-type CuentaSummary = Prisma.CuentaGetPayload<{ select: typeof cuentaSummarySelect }>;
+type CuentaSummary = Prisma.CuentaGetPayload<{
+  select: typeof cuentaSummarySelect;
+}>;
 
 const cuentaWithRolesSelect = {
   ...cuentaSummarySelect,
@@ -30,38 +32,25 @@ const cuentaWithRolesSelect = {
 type CuentaWithRoles = Prisma.CuentaGetPayload<{
   select: typeof cuentaWithRolesSelect;
 }>;
-
+type Tx = Prisma.TransactionClient;
 @Injectable()
 export class CuentaService {
   async create(
-    prisma: CuentaPrismaClient,
+    tx: Tx,
     createCuentaDto: CreateCuentaDto,
   ): Promise<CuentaSummary> {
-    try {
-      const { user, password } = createCuentaDto;
-      const hashedPassword = await bcrypt.hash(
-        password,
-        Number(process.env.HASH_SALT),
-      );
+    const { user, password } = createCuentaDto;
+    const hashedPassword = await bcrypt.hash(
+      password,
+      Number(process.env.HASH_SALT),
+    );
 
-      const cuenta = await prisma.cuenta.create({
-        data: { user, password: hashedPassword },
-        select: cuentaSummarySelect,
-      });
+    const cuenta = await tx.cuenta.create({
+      data: { user, password: hashedPassword },
+      select: cuentaSummarySelect,
+    });
 
-      if (!cuenta) {
-        throw new ErrorManager({
-          type: 'BAD_REQUEST',
-          message: 'Error creando cuenta',
-        });
-      }
-
-      return cuenta;
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Error desconocido';
-      throw ErrorManager.createSignatureError(message);
-    }
+    return cuenta;
   }
 
   async findAll(prisma: CuentaPrismaClient): Promise<CuentaSummary[]> {
@@ -76,7 +65,10 @@ export class CuentaService {
     }
   }
 
-  async findById(prisma: CuentaPrismaClient, id: number): Promise<CuentaWithRoles> {
+  async findById(
+    prisma: CuentaPrismaClient,
+    id: number,
+  ): Promise<CuentaWithRoles> {
     try {
       const cuenta = await prisma.cuenta.findUnique({
         where: { id },

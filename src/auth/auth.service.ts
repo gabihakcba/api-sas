@@ -120,10 +120,15 @@ export class AuthService {
     const cuentaId = Number(sub);
 
     if (!Number.isFinite(cuentaId)) {
-      throw new UnauthorizedException('Token de refresco inválido: sub inesperado');
+      throw new UnauthorizedException(
+        'Token de refresco inválido: sub inesperado',
+      );
     }
 
-    const cuenta = await this.cuentaService.findById(this.prismaService, cuentaId);
+    const cuenta = await this.cuentaService.findById(
+      this.prismaService,
+      cuentaId,
+    );
     return this.buildTokens(cuenta);
   }
 
