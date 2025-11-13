@@ -1,88 +1,38 @@
 import { Injectable } from '@nestjs/common';
 import { instanceToPlain } from 'class-transformer';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { ErrorManager } from 'src/utils/error.manager';
 import { CreateMiembroDto } from './dto/create-miembro.dto';
 import { UpdateMiembroDto } from './dto/update-miembro.dto';
 import { CuentaService } from 'src/cuenta/cuenta.service';
+import { Miembro } from './types/miembro';
 
 type Tx = Prisma.TransactionClient;
-type MiembroPrismaClient = Prisma.TransactionClient | PrismaClient;
-
-const miembroSummarySelect = {
-  id: true,
-  nombre: true,
-  apellidos: true,
-  dni: true,
-  fecha_nacimiento: true,
-  direccion: true,
-  email: true,
-  telefono: true,
-  telefono_emergencia: true,
-  totem: true,
-  cualidad: true,
-  borrado: true,
-  createdAt: true,
-  updatedAt: true,
-  Cuenta: {
-    select: {
-      id: true,
-      user: true,
-      borrado: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  },
-} as const;
-
-type MiembroSummary = Prisma.MiembroGetPayload<{
-  select: typeof miembroSummarySelect;
-}>;
-
-const miembroWithRamaSelect = {
-  ...miembroSummarySelect,
-  MiembroRama: { select: { Rama: true } },
-} as const;
-
-type MiembroWithRama = Prisma.MiembroGetPayload<{
-  select: typeof miembroWithRamaSelect;
-}>;
-
-type MiembroWithRamaName = Omit<MiembroWithRama, 'MiembroRama'> & {
-  rama?: string;
-};
 
 @Injectable()
 export class MiembroService {
   constructor(private readonly cuentaService: CuentaService) {}
 
-  async create(
-    tx: Tx,
-    createMiembroDto: CreateMiembroDto,
-  ): Promise<MiembroWithRamaName> {
-    const { cuenta, fecha_nacimiento, id_rama, ...miembroInput } =
-      createMiembroDto;
-
-    const nuevaCuenta = await this.cuentaService.create(tx, cuenta);
+  async create(tx: Tx, createMiembroDto: CreateMiembroDto): Promise<Miembro> {
+    const nuevaCuenta = await this.cuentaService.create(tx, {
+      user: createMiembroDto.dni,
+      password: createMiembroDto.dni,
+    });
 
     const miembro = await tx.miembro.create({
       data: {
-        ...miembroInput,
-        fecha_nacimiento: new Date(fecha_nacimiento),
+        ...createMiembroDto,
         Cuenta: { connect: { id: nuevaCuenta.id } },
-        MiembroRama: { create: { id_rama } },
       },
-      select: miembroWithRamaSelect,
+      include: {
+        Cuenta: true,
+      },
     });
 
-    return {
-      ...miembro,
-      rama: miembro.MiembroRama?.Rama?.nombre,
-    };
+    return miembro;
   }
 
-  async findAll(prisma: MiembroPrismaClient): Promise<MiembroWithRamaName[]> {
+  async findAll(prisma: Tx): Promise<any[]> {
     try {
       const miembros = await prisma.miembro.findMany({
         where: {
@@ -91,24 +41,16 @@ export class MiembroService {
             is: { borrado: false },
           },
         },
-        select: miembroWithRamaSelect,
       });
 
-      return miembros.map((miembro) => ({
-        ...miembro,
-        rama: miembro.MiembroRama?.Rama?.nombre,
-      }));
+      return miembros;
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Error desconocido';
-      throw ErrorManager.createSignatureError(message);
+      console.log(error);
+      throw new Error(JSON.stringify(error));
     }
   }
 
-  async findOne(
-    prisma: MiembroPrismaClient,
-    id: number,
-  ): Promise<MiembroSummary> {
+  async findOne(prisma: Tx, id: number): Promise<any> {
     try {
       const miembro = await prisma.miembro.findFirst({
         where: {
@@ -118,29 +60,24 @@ export class MiembroService {
             is: { borrado: false },
           },
         },
-        select: miembroSummarySelect,
       });
 
       if (!miembro) {
-        throw new ErrorManager({
-          type: 'NOT_FOUND',
-          message: 'Miembro no encontrado',
-        });
+        throw new Error(JSON.stringify('Miembro no encontrado'));
       }
 
       return miembro;
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Error desconocido';
-      throw ErrorManager.createSignatureError(message);
+      console.log(error);
+      throw new Error(JSON.stringify(error));
     }
   }
 
   async update(
-    prisma: MiembroPrismaClient,
+    prisma: Tx,
     id: number,
     updateMiembroDto: UpdateMiembroDto,
-  ): Promise<MiembroSummary> {
+  ): Promise<any> {
     try {
       const exists = await prisma.miembro.findFirst({
         where: { id, borrado: false },
@@ -148,10 +85,7 @@ export class MiembroService {
       });
 
       if (!exists) {
-        throw new ErrorManager({
-          type: 'NOT_FOUND',
-          message: 'Miembro no encontrado',
-        });
+        throw new Error(JSON.stringify('Miembro no encontrado'));
       }
 
       const plainUpdate = instanceToPlain(updateMiembroDto, {
@@ -188,21 +122,16 @@ export class MiembroService {
       const miembroActualizado = await prisma.miembro.update({
         where: { id },
         data,
-        select: miembroSummarySelect,
       });
 
       return miembroActualizado;
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Error desconocido';
-      throw ErrorManager.createSignatureError(message);
+      console.log(error);
+      throw new Error(JSON.stringify(error));
     }
   }
 
-  async remove(
-    prisma: MiembroPrismaClient,
-    id: number,
-  ): Promise<MiembroSummary> {
+  async remove(prisma: Tx, id: number): Promise<any> {
     try {
       const exists = await prisma.miembro.findFirst({
         where: { id, borrado: false },
@@ -210,10 +139,7 @@ export class MiembroService {
       });
 
       if (!exists) {
-        throw new ErrorManager({
-          type: 'NOT_FOUND',
-          message: 'Miembro no encontrado',
-        });
+        throw new Error(JSON.stringify('Miembro no encontrado'));
       }
 
       const miembroBorrado = await prisma.miembro.update({
@@ -224,14 +150,12 @@ export class MiembroService {
             update: { borrado: true },
           },
         },
-        select: miembroSummarySelect,
       });
 
       return miembroBorrado;
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Error desconocido';
-      throw ErrorManager.createSignatureError(message);
+      console.log(error);
+      throw new Error(JSON.stringify(error));
     }
   }
 }

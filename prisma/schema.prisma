@@ -658,7 +658,7 @@ model RolePermission {
   id_role       Int
   id_permission Int
 
-  tipo_scoup SCOPE
+  tipo_scope SCOPE
   id_scope   Int? // FK a rama si aplica
 
   // Foreign key relations

@@ -9,6 +9,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from 'src/auth/guards/auth.guard';
 import { MiembroModule } from './miembro/miembro.module';
 import { RamaModule } from './rama/rama.module';
+import { ProtagonistaModule } from './protagonista/protagonista.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { RamaModule } from './rama/rama.module';
     AuthModule,
     MiembroModule,
     RamaModule,
+    ProtagonistaModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: AuthGuard }],

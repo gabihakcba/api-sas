@@ -1,97 +1,81 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { AuthAccountContext } from 'src/auth/interfaces/auth-account-context.interface';
-import { ErrorManager } from '../utils/error.manager';
 import { CreateCuentaDto } from './dto/create-cuenta.dto';
 import { UpdateCuentaDto } from './dto/update-cuenta.dto';
+import { Tx } from 'src/prisma/types/prisma';
+import { Cuenta, CuentaWithRole } from './types/cuenta';
 
-type CuentaPrismaClient = Prisma.TransactionClient | PrismaClient;
-
-const cuentaSummarySelect = {
-  id: true,
-  user: true,
-  borrado: true,
-  createdAt: true,
-  updatedAt: true,
-} as const;
-
-type CuentaSummary = Prisma.CuentaGetPayload<{
-  select: typeof cuentaSummarySelect;
-}>;
-
-const cuentaWithRolesSelect = {
-  ...cuentaSummarySelect,
-  CuentaRole: {
-    include: {
-      Role: true,
-    },
-  },
-} as const;
-
-type CuentaWithRoles = Prisma.CuentaGetPayload<{
-  select: typeof cuentaWithRolesSelect;
-}>;
-type Tx = Prisma.TransactionClient;
 @Injectable()
 export class CuentaService {
-  async create(
-    tx: Tx,
-    createCuentaDto: CreateCuentaDto,
-  ): Promise<CuentaSummary> {
-    const { user, password } = createCuentaDto;
-    const hashedPassword = await bcrypt.hash(
-      password,
-      Number(process.env.HASH_SALT),
-    );
-
-    const cuenta = await tx.cuenta.create({
-      data: { user, password: hashedPassword },
-      select: cuentaSummarySelect,
-    });
-
-    return cuenta;
-  }
-
-  async findAll(prisma: CuentaPrismaClient): Promise<CuentaSummary[]> {
+  async create(tx: Tx, createCuentaDto: CreateCuentaDto): Promise<Cuenta> {
     try {
-      return await prisma.cuenta.findMany({
-        select: cuentaSummarySelect,
+      const { user, password } = createCuentaDto;
+      const hashedPassword = await bcrypt.hash(
+        password,
+        Number(process.env.HASH_SALT),
+      );
+
+      const cuenta = await tx.cuenta.create({
+        data: { user, password: hashedPassword },
       });
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Error desconocido';
-      throw ErrorManager.createSignatureError(message);
+
+      return cuenta;
+    } catch (error) {
+      console.log(error);
+      throw new Error(JSON.stringify(error));
     }
   }
 
-  async findById(
-    prisma: CuentaPrismaClient,
-    id: number,
-  ): Promise<CuentaWithRoles> {
+  async findAll(prisma: Tx): Promise<Cuenta[]> {
+    try {
+      return await prisma.cuenta.findMany({});
+    } catch (error: unknown) {
+      console.log(error);
+      throw new Error(JSON.stringify(error));
+    }
+  }
+
+  async findById(prisma: Tx, id: number): Promise<CuentaWithRole> {
     try {
       const cuenta = await prisma.cuenta.findUnique({
         where: { id },
-        select: cuentaWithRolesSelect,
+        select: {
+          id: true,
+          user: true,
+          password: true,
+          CuentaRole: {
+            select: {
+              id: true,
+              createdAt: true,
+              id_cuenta: true,
+              id_role: true,
+              Role: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  descripcion: true,
+                },
+              },
+            },
+          },
+        },
       });
 
       if (!cuenta) {
-        throw new ErrorManager({
-          type: 'BAD_REQUEST',
-          message: 'Cuenta no encontrada',
-        });
+        throw new Error(JSON.stringify('Cuenta no encontrada'));
       }
 
       return cuenta;
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Error desconocido';
-      throw ErrorManager.createSignatureError(message);
+      console.log(error);
+      throw new Error(JSON.stringify(error));
     }
   }
 
   async buildAuthAccountContext(
-    prisma: CuentaPrismaClient,
+    prisma: Tx,
     id: number,
   ): Promise<AuthAccountContext | null> {
     const cuenta = await prisma.cuenta.findUnique({
@@ -169,16 +153,12 @@ export class CuentaService {
     };
   }
 
-  async findByUser(
-    prisma: CuentaPrismaClient,
-    user: string,
-    withPassword: boolean,
-  ) {
+  async findByUser(prisma: Tx, user: string, withPassword: boolean) {
     try {
       return await prisma.cuenta.findUnique({
         where: { user },
         select: {
-          ...cuentaSummarySelect,
+          id: true,
           ...(withPassword ? { password: true } : {}),
           Miembro: {
             select: {
@@ -198,17 +178,16 @@ export class CuentaService {
         },
       });
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Error desconocido';
-      throw ErrorManager.createSignatureError(message);
+      console.log(error);
+      throw new Error(JSON.stringify(error));
     }
   }
 
   async update(
-    prisma: CuentaPrismaClient,
+    prisma: Tx,
     id: number,
     updateCuentaDto: UpdateCuentaDto,
-  ): Promise<CuentaSummary> {
+  ): Promise<Cuenta> {
     try {
       const data: Prisma.CuentaUpdateInput = {};
 
@@ -224,38 +203,31 @@ export class CuentaService {
       }
 
       if (Object.keys(data).length === 0) {
-        throw new ErrorManager({
-          type: 'BAD_REQUEST',
-          message: 'No hay campos para actualizar',
-        });
+        throw new Error(JSON.stringify('No hay campos para actualizar'));
       }
 
       const cuenta = await prisma.cuenta.update({
         where: { id },
         data,
-        select: cuentaSummarySelect,
       });
 
       return cuenta;
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Error desconocido';
-      throw ErrorManager.createSignatureError(message);
+      console.log(error);
+      throw new Error(JSON.stringify(error));
     }
   }
 
-  async remove(prisma: CuentaPrismaClient, id: number): Promise<CuentaSummary> {
+  async remove(prisma: Tx, id: number): Promise<Cuenta> {
     try {
       const cuenta = await prisma.cuenta.delete({
         where: { id },
-        select: cuentaSummarySelect,
       });
 
       return cuenta;
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Error desconocido';
-      throw ErrorManager.createSignatureError(message);
+      console.log(error);
+      throw new Error(JSON.stringify(error));
     }
   }
 }

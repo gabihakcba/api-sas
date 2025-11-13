@@ -5,7 +5,7 @@ import { UpdateCuentaDto } from 'src/cuenta/dto/update-cuenta.dto';
 import { CreateMiembroDto } from './create-miembro.dto';
 
 class PartialMiembroDto extends PartialType(
-  OmitType(CreateMiembroDto, ['cuenta', 'fecha_nacimiento'] as const),
+  OmitType(CreateMiembroDto, ['fecha_nacimiento'] as const),
 ) {
   @IsOptional()
   @Type(() => Date)

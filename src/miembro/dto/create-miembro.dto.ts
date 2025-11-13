@@ -2,13 +2,9 @@ import {
   IsDateString,
   IsEmail,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
-  ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-import { CreateCuentaDto } from '../../cuenta/dto/create-cuenta.dto';
 
 export class CreateMiembroDto {
   @IsNotEmpty()
@@ -25,7 +21,7 @@ export class CreateMiembroDto {
 
   @IsNotEmpty()
   @IsDateString()
-  fecha_nacimiento: string;
+  fecha_nacimiento: Date;
 
   @IsNotEmpty()
   @IsString()
@@ -50,14 +46,4 @@ export class CreateMiembroDto {
   @IsOptional()
   @IsString()
   cualidad?: string;
-
-  @IsNotEmpty()
-  @ValidateNested()
-  @Type(() => CreateCuentaDto)
-  cuenta: CreateCuentaDto;
-
-  @IsNotEmpty()
-  @Type(() => Number)
-  @IsNumber()
-  id_rama: number;
 }
