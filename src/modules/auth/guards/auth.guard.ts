@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { PUBLICK_KEY } from 'src/common/constants/key-decorators';
+import { IS_PUBLIC_KEY } from 'src/common/constants/key-decorators';
 import { AuthService } from '../auth.service';
 import { AuthTokenPayload } from '../interfaces/auth-token-payload.interface';
 
@@ -18,7 +18,7 @@ export class AuthGuard implements CanActivate {
   ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const isPublic = this.reflector.getAllAndOverride<boolean>(PUBLICK_KEY, [
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
