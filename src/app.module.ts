@@ -11,6 +11,7 @@ import { MiembroModule } from './modules/miembro/miembro.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
 import { ProtagonistaModule } from './modules/protagonista/protagonista.module';
 import { RamaModule } from './modules/rama/rama.module';
+import { PermissionsGuard } from './common/guards/permissions.guard';
 
 @Module({
   imports: [
@@ -35,6 +36,10 @@ import { RamaModule } from './modules/rama/rama.module';
     ProtagonistaModule,
   ],
   controllers: [AppController],
-  providers: [AppService, { provide: APP_GUARD, useClass: AuthGuard }],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: AuthGuard },
+    { provide: APP_GUARD, useClass: PermissionsGuard },
+  ],
 })
-export class AppModule {}
+export class AppModule { }

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CreateProtagonistaDto } from './dto/create-protagonista.dto';
 import { UpdateProtagonistaDto } from './dto/update-protagonista.dto';
 import { PrismaClient } from '@prisma/client';
+import { Tx } from '../prisma/types/prisma';
 import { CuentaService } from 'src/modules/cuenta/cuenta.service';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 
@@ -17,7 +18,7 @@ export class ProtagonistaService {
       const { miembro, id_rama, ...rest } = createProtagonistaDto;
       console.log(createProtagonistaDto);
       const protagonista = await this.prismaService.$transaction(
-        async (tx: PrismaClient) => {
+        async (tx: Tx) => {
           const nuevaCuenta = await this.cuentaService.create(tx, {
             user: miembro.dni,
             password: miembro.dni,

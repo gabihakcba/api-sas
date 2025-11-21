@@ -20,37 +20,37 @@ const ramaSeeds: Array<{
   edad_maxima_protagonistas: number;
   edad_minima_adulto: number;
 }> = [
-  {
-    nombre: RAMAS.CASTORES,
-    edad_minima_protagonistas: 3,
-    edad_maxima_protagonistas: 5,
-    edad_minima_adulto: 22,
-  },
-  {
-    nombre: RAMAS.MANADA,
-    edad_minima_protagonistas: 6,
-    edad_maxima_protagonistas: 10,
-    edad_minima_adulto: 22,
-  },
-  {
-    nombre: RAMAS.UNIDAD,
-    edad_minima_protagonistas: 11,
-    edad_maxima_protagonistas: 13,
-    edad_minima_adulto: 22,
-  },
-  {
-    nombre: RAMAS.CAMINANTES,
-    edad_minima_protagonistas: 14,
-    edad_maxima_protagonistas: 17,
-    edad_minima_adulto: 25,
-  },
-  {
-    nombre: RAMAS.ROVER,
-    edad_minima_protagonistas: 18,
-    edad_maxima_protagonistas: 22,
-    edad_minima_adulto: 30,
-  },
-];
+    {
+      nombre: RAMAS.CASTORES,
+      edad_minima_protagonistas: 3,
+      edad_maxima_protagonistas: 5,
+      edad_minima_adulto: 22,
+    },
+    {
+      nombre: RAMAS.MANADA,
+      edad_minima_protagonistas: 6,
+      edad_maxima_protagonistas: 10,
+      edad_minima_adulto: 22,
+    },
+    {
+      nombre: RAMAS.UNIDAD,
+      edad_minima_protagonistas: 11,
+      edad_maxima_protagonistas: 13,
+      edad_minima_adulto: 22,
+    },
+    {
+      nombre: RAMAS.CAMINANTES,
+      edad_minima_protagonistas: 14,
+      edad_maxima_protagonistas: 17,
+      edad_minima_adulto: 25,
+    },
+    {
+      nombre: RAMAS.ROVER,
+      edad_minima_protagonistas: 18,
+      edad_maxima_protagonistas: 22,
+      edad_minima_adulto: 30,
+    },
+  ];
 
 const readOnlyResources: RESOURCE[] = [RESOURCE.LOG, RESOURCE.ACTION];
 
@@ -71,7 +71,14 @@ const addRole = (
 addRole(
   'SUPER_ADMIN',
   'Acceso total a todos los recursos',
-  allResources.map((resource) => ({ resource, action: ACTION.MANAGE })),
+  allResources.map((resource) => {
+    // Si es un recurso de solo lectura (LOGS), solo damos permiso READ
+    if (readOnlyResources.includes(resource)) {
+      return { resource, action: ACTION.READ };
+    }
+    // Para todo lo demás, damos MANAGE
+    return { resource, action: ACTION.MANAGE };
+  }),
 );
 
 addRole(
@@ -173,12 +180,12 @@ async function seedPermissions(): Promise<Record<string, number>> {
     const actions = readOnlyResources.includes(resource as RESOURCE)
       ? [ACTION.READ]
       : [
-          ACTION.CREATE,
-          ACTION.READ,
-          ACTION.UPDATE,
-          ACTION.DELETE,
-          ACTION.MANAGE,
-        ];
+        ACTION.CREATE,
+        ACTION.READ,
+        ACTION.UPDATE,
+        ACTION.DELETE,
+        ACTION.MANAGE,
+      ];
 
     for (const action of actions) {
       const permission = await prisma.permission.upsert({

@@ -32,11 +32,13 @@ export class ProtagonistaController {
   }
 
   @Get(':id')
+  @RequirePermission(ACTION.READ, RESOURCE.PROTAGONISTA)
   findOne(@Param('id') id: string) {
     return this.protagonistaService.findOne(+id);
   }
 
   @Patch(':id')
+  @RequirePermission(ACTION.UPDATE, RESOURCE.PROTAGONISTA)
   update(
     @Param('id') id: string,
     @Body() updateProtagonistaDto: UpdateProtagonistaDto,
@@ -45,6 +47,7 @@ export class ProtagonistaController {
   }
 
   @Delete(':id')
+  @RequirePermission(ACTION.DELETE, RESOURCE.PROTAGONISTA)
   remove(@Param('id') id: string) {
     return this.protagonistaService.remove(+id);
   }
