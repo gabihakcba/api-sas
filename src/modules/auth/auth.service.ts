@@ -3,7 +3,6 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
-import { AuthTokenPayload } from './interfaces/auth-token-payload.interface';
 import { CuentaService } from '../cuenta/cuenta.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -134,7 +133,7 @@ export class AuthService {
   public useToken(
     token: string,
     secret: string = this.getAccessSecret(),
-  ): AuthTokenPayload | string {
+  ) {
     try {
       const decoded = jwt.verify(token, secret);
 
@@ -174,7 +173,7 @@ export class AuthService {
         sub,
         roles: validatedRoles,
         username,
-      } as AuthTokenPayload;
+      }
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
         throw new UnauthorizedException(

@@ -3,13 +3,12 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { CuentaModule } from '../cuenta/cuenta.module';
 import { AuthGuard } from './guards/auth.guard';
-import { RolesGuard } from './guards/roles.guard';
 
 @Global()
 @Module({
   imports: [CuentaModule],
-  providers: [AuthService, AuthGuard, RolesGuard],
+  providers: [AuthService, AuthGuard],
   controllers: [AuthController],
-  exports: [AuthService, AuthGuard, RolesGuard],
+  exports: [AuthService, AuthGuard],
 })
-export class AuthModule {}
+export class AuthModule { }

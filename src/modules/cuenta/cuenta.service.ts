@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { AuthAccountContext } from 'src/modules/auth/interfaces/auth-account-context.interface';
 import { CreateCuentaDto } from './dto/create-cuenta.dto';
 import { UpdateCuentaDto } from './dto/update-cuenta.dto';
 import { Tx } from 'src/modules/prisma/types/prisma';
@@ -85,7 +84,7 @@ export class CuentaService {
   async buildAuthAccountContext(
     prisma: Tx,
     id: number,
-  ): Promise<AuthAccountContext | null> {
+  ) {
     const cuenta = await prisma.cuenta.findUnique({
       where: { id },
       select: {
@@ -112,7 +111,7 @@ export class CuentaService {
       return null;
     }
 
-    const dependents: AuthAccountContext['dependents'] = [];
+    const dependents: Array<any> = [];
     const responsableId = cuenta.Miembro?.Responsable?.id;
 
     if (typeof responsableId === 'number') {
