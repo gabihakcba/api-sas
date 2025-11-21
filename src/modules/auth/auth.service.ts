@@ -1,3 +1,4 @@
+import { type Cuenta } from '@prisma/client';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -6,19 +7,28 @@ import { AuthTokenPayload } from './interfaces/auth-token-payload.interface';
 import { CuentaService } from '../cuenta/cuenta.service';
 import { PrismaService } from '../prisma/prisma.service';
 
+export interface JwtPayload {
+  sub: number;
+  username: string;
+  roles: Array<{
+    name: string;
+    scope: 'GLOBAL' | 'RAMA' | 'OWN';
+    scopeId?: number | null;
+  }>;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
     private readonly cuentaService: CuentaService,
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   public async validateUser(user: string, password: string) {
     const cuenta = await this.cuentaService.findByUser(
       this.prismaService,
       user,
-      true,
     );
     if (cuenta) {
       const isMatch = await bcrypt.compare(password, cuenta.password);
@@ -63,26 +73,15 @@ export class AuthService {
     return refreshSecret ?? this.getAccessSecret();
   }
 
-  private buildTokens({
-    id,
-    CuentaRole,
-    ...rest
-  }: {
-    id: number;
-    user: string;
-    CuentaRole: Array<{
-      Role: {
-        nombre: string;
-        descripcion: string | null;
-        [key: string]: unknown;
-      };
-      [key: string]: unknown;
-    }>;
-    [key: string]: unknown;
-  }) {
-    const payload: { sub: number; roles: string[] } = {
-      sub: id,
-      roles: CuentaRole.map((cr) => cr.Role.nombre),
+  private buildTokens(cuenta: any) {
+    const payload: JwtPayload = {
+      sub: cuenta.id,
+      username: cuenta.user,
+      roles: cuenta.CuentaRole.map((cr: any) => ({
+        name: cr.Role.nombre,
+        scope: cr.tipo_scope,
+        scopeId: cr.id_scope,
+      })),
     };
 
     return {
@@ -96,25 +95,14 @@ export class AuthService {
         secret: this.getRefreshSecret(),
         expiresIn: '7d',
       }),
-      cuenta: { id, CuentaRole, ...rest },
     };
   }
 
   public async generateJwt(user: string) {
-    const cuenta = (await this.cuentaService.findByUser(
+    const cuenta = await this.cuentaService.findByUser(
       this.prismaService,
       user,
-      false,
-    )) as {
-      id: number;
-      user: string;
-      CuentaRole: Array<{
-        Role: {
-          nombre: string;
-          descripcion: string | null;
-        };
-      }>;
-    } | null;
+    );
     if (cuenta) {
       return this.buildTokens(cuenta);
     }
@@ -154,24 +142,39 @@ export class AuthService {
         return decoded;
       }
 
-      const { sub, roles } = decoded as jwt.JwtPayload & {
+      const { sub, roles, username } = decoded as jwt.JwtPayload & {
         sub?: unknown;
         roles?: unknown;
+        username?: unknown;
       };
 
-      if (typeof sub !== 'number' || !Array.isArray(roles)) {
+      if (
+        typeof sub !== 'number' ||
+        !Array.isArray(roles) ||
+        typeof username !== 'string'
+      ) {
         throw new UnauthorizedException('Token inválido: payload inesperado');
       }
 
-      const validatedRoles = roles.filter((role): role is string => {
-        return typeof role === 'string';
+      const validatedRoles = roles.filter((role): role is any => {
+        return (
+          typeof role === 'object' &&
+          role !== null &&
+          typeof role.name === 'string' &&
+          typeof role.scope === 'string'
+        );
       });
 
       if (validatedRoles.length !== roles.length) {
         throw new UnauthorizedException('Token inválido: payload inesperado');
       }
 
-      return { ...decoded, sub, roles: validatedRoles } as AuthTokenPayload;
+      return {
+        ...decoded,
+        sub,
+        roles: validatedRoles,
+        username,
+      } as AuthTokenPayload;
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
         throw new UnauthorizedException(

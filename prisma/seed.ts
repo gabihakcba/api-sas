@@ -1,326 +1,249 @@
-// prisma/seed.ts
-import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
-import { AREAS } from 'src/common/constants/db/areas';
-import { POSICIONES } from 'src/common/constants/db/posiciones';
-import { RAMAS } from 'src/common/constants/db/ramas';
-import { ROLES } from 'src/common/constants/db/roles';
+import { ACTION, PrismaClient, RESOURCE } from '@prisma/client';
+import { AREAS } from '../src/common/constants/db/areas';
+import { RAMAS } from '../src/common/constants/db/ramas';
 
 const prisma = new PrismaClient();
 
-async function main() {
-  // 1) Roles
-  const roles = await prisma.$transaction([
-    prisma.role.upsert({
-      where: { nombre: ROLES.JEFATURA },
-      update: {},
-      create: { nombre: ROLES.JEFATURA, descripcion: 'Jefatura: acceso total' },
-    }),
-    prisma.role.upsert({
-      where: { nombre: ROLES.JEFATURA_RAMA },
-      update: {},
-      create: { nombre: ROLES.JEFATURA, descripcion: '-' },
-    }),
-    prisma.role.upsert({
-      where: { nombre: ROLES.TESORERIA },
-      update: {},
-      create: { nombre: ROLES.TESORERIA, descripcion: '-' },
-    }),
-    prisma.role.upsert({
-      where: { nombre: ROLES.TESORERIA_RAMA },
-      update: {},
-      create: { nombre: ROLES.TESORERIA_RAMA, descripcion: '-' },
-    }),
-    prisma.role.upsert({
-      where: { nombre: ROLES.AYUDANTE_RAMA },
-      update: {},
-      create: { nombre: ROLES.AYUDANTE_RAMA, descripcion: '-' },
-    }),
-    prisma.role.upsert({
-      where: { nombre: ROLES.RESPONSABLE },
-      update: {},
-      create: { nombre: ROLES.RESPONSABLE, descripcion: '-' },
-    }),
-    prisma.role.upsert({
-      where: { nombre: ROLES.PROTAGONISTA },
-      update: {},
-      create: { nombre: ROLES.PROTAGONISTA, descripcion: '-' },
-    }),
-  ]);
+type ResourcePermission = { resource: RESOURCE; action: ACTION };
 
-  // 2) Usuario admin (solo si no existe)
-  const adminUser = await prisma.cuenta.findUnique({
-    where: { user: '40684496' },
-  });
+const areaSeeds: Array<{ nombre: string; descripcion?: string }> = [
+  { nombre: AREAS.JEFATURA, descripcion: 'Jefatura' },
+  { nombre: AREAS.TESORERIA, descripcion: 'Tesorería' },
+  { nombre: AREAS.SECRETARIA, descripcion: 'Secretaría' },
+  { nombre: AREAS.INTENDENCIA, descripcion: 'Intendencia' },
+  { nombre: AREAS.RAMA, descripcion: 'Rama' },
+];
 
-  if (!adminUser) {
-    const password = await bcrypt.hash('40684496', 10);
-    const created = await prisma.cuenta.create({
-      data: {
-        user: 'admin',
-        password,
-        CuentaRole: { connect: roles.map((r) => ({ id: r.id })) },
-      },
-    });
-    console.log('Admin creado:', created.user);
-  } else {
-    console.log('Admin ya existe, omitiendo…');
+const ramaSeeds: Array<{
+  nombre: string;
+  edad_minima_protagonistas: number;
+  edad_maxima_protagonistas: number;
+  edad_minima_adulto: number;
+}> = [
+  {
+    nombre: RAMAS.CASTORES,
+    edad_minima_protagonistas: 3,
+    edad_maxima_protagonistas: 5,
+    edad_minima_adulto: 22,
+  },
+  {
+    nombre: RAMAS.MANADA,
+    edad_minima_protagonistas: 6,
+    edad_maxima_protagonistas: 10,
+    edad_minima_adulto: 22,
+  },
+  {
+    nombre: RAMAS.UNIDAD,
+    edad_minima_protagonistas: 11,
+    edad_maxima_protagonistas: 13,
+    edad_minima_adulto: 22,
+  },
+  {
+    nombre: RAMAS.CAMINANTES,
+    edad_minima_protagonistas: 14,
+    edad_maxima_protagonistas: 17,
+    edad_minima_adulto: 25,
+  },
+  {
+    nombre: RAMAS.ROVER,
+    edad_minima_protagonistas: 18,
+    edad_maxima_protagonistas: 22,
+    edad_minima_adulto: 30,
+  },
+];
+
+const readOnlyResources: RESOURCE[] = [RESOURCE.LOG, RESOURCE.ACTION];
+
+const roleDefinitions: Array<{
+  nombre: string;
+  descripcion: string;
+  permissions: ResourcePermission[];
+}> = [];
+
+const allResources = Object.values(RESOURCE);
+
+const addRole = (
+  nombre: string,
+  descripcion: string,
+  permissions: ResourcePermission[],
+) => roleDefinitions.push({ nombre, descripcion, permissions });
+
+addRole(
+  'SUPER_ADMIN',
+  'Acceso total a todos los recursos',
+  allResources.map((resource) => ({ resource, action: ACTION.MANAGE })),
+);
+
+addRole(
+  'JEFE_GRUPO',
+  'Gestión operativa y lectura de estructura',
+  [
+    RESOURCE.MIEMBRO,
+    RESOURCE.PROTAGONISTA,
+    RESOURCE.ADULTO,
+    RESOURCE.RESPONSABLE,
+    RESOURCE.EVENTO,
+    RESOURCE.INSCRIPCION,
+    RESOURCE.PAGO,
+    RESOURCE.ASISTENCIA,
+  ]
+    .map(
+      (resource): ResourcePermission => ({ resource, action: ACTION.MANAGE }),
+    )
+    .concat([
+      { resource: RESOURCE.AREA, action: ACTION.READ },
+      { resource: RESOURCE.RAMA, action: ACTION.READ },
+    ]),
+);
+
+addRole('JEFE_RAMA', 'Gestión de protagonistas y eventos de su rama', [
+  { resource: RESOURCE.PROTAGONISTA, action: ACTION.MANAGE },
+  { resource: RESOURCE.ASISTENCIA, action: ACTION.MANAGE },
+  { resource: RESOURCE.EVENTO, action: ACTION.MANAGE },
+  { resource: RESOURCE.PLAN_FORMACION, action: ACTION.MANAGE },
+]);
+
+addRole('SECRETARIA', 'Gestión de miembros y libros de actas', [
+  { resource: RESOURCE.MIEMBRO, action: ACTION.MANAGE },
+  { resource: RESOURCE.ADULTO, action: ACTION.MANAGE },
+  { resource: RESOURCE.LIBRO_ACTAS, action: ACTION.MANAGE },
+]);
+
+addRole('TESORERIA', 'Gestión financiera', [
+  { resource: RESOURCE.PAGO, action: ACTION.MANAGE },
+  { resource: RESOURCE.CUENTA_DINERO, action: ACTION.MANAGE },
+  { resource: RESOURCE.PRESUPUESTO, action: ACTION.MANAGE },
+]);
+
+addRole('MIEMBRO_ACTIVO', 'Participante con acceso de lectura', [
+  { resource: RESOURCE.PROTAGONISTA, action: ACTION.READ },
+  { resource: RESOURCE.EVENTO, action: ACTION.READ },
+]);
+
+addRole('FAMILIA', 'Responsable/familia con lectura acotada', [
+  { resource: RESOURCE.PROTAGONISTA, action: ACTION.READ },
+  { resource: RESOURCE.PAGO, action: ACTION.READ },
+]);
+
+async function seedAreas() {
+  const areas = await Promise.all(
+    areaSeeds.map((area) =>
+      prisma.area.upsert({
+        where: { nombre: area.nombre },
+        update: { descripcion: area.descripcion ?? '' },
+        create: { nombre: area.nombre, descripcion: area.descripcion ?? '' },
+      }),
+    ),
+  );
+
+  return areas.reduce<Record<string, number>>((acc, area) => {
+    acc[area.nombre] = area.id;
+    return acc;
+  }, {});
+}
+
+async function seedRamas(idAreaRama: number) {
+  return Promise.all(
+    ramaSeeds.map((rama) =>
+      prisma.rama.upsert({
+        where: { nombre: rama.nombre },
+        update: {
+          edad_minima_protagonistas: rama.edad_minima_protagonistas,
+          edad_maxima_protagonistas: rama.edad_maxima_protagonistas,
+          edad_minima_adulto: rama.edad_minima_adulto,
+          id_area: idAreaRama,
+        },
+        create: {
+          borrado: false,
+          nombre: rama.nombre,
+          edad_minima_protagonistas: rama.edad_minima_protagonistas,
+          edad_maxima_protagonistas: rama.edad_maxima_protagonistas,
+          edad_minima_adulto: rama.edad_minima_adulto,
+          id_area: idAreaRama,
+        },
+      }),
+    ),
+  );
+}
+
+async function seedPermissions(): Promise<Record<string, number>> {
+  const permissions: Record<string, number> = {};
+
+  for (const resource of allResources) {
+    const actions = readOnlyResources.includes(resource as RESOURCE)
+      ? [ACTION.READ]
+      : [
+          ACTION.CREATE,
+          ACTION.READ,
+          ACTION.UPDATE,
+          ACTION.DELETE,
+          ACTION.MANAGE,
+        ];
+
+    for (const action of actions) {
+      const permission = await prisma.permission.upsert({
+        where: { action_resource: { action, resource } },
+        update: {},
+        create: { action, resource },
+      });
+      permissions[`${resource}:${action}`] = permission.id;
+    }
   }
 
-  // 3) Ramas
-  const ramas = await prisma.$transaction([
-    prisma.rama.upsert({
-      where: { nombre: RAMAS.CASTORES },
-      update: {},
-      create: {
-        borrado: true,
-        nombre: RAMAS.CASTORES,
-        edad_minima_protagonistas: 3,
-        edad_maxima_protagonistas: 5,
-        edad_minima_adulto: 22,
-      },
-    }),
-    prisma.rama.upsert({
-      where: { nombre: RAMAS.MANADA },
-      update: {},
-      create: {
-        nombre: RAMAS.MANADA,
-        edad_minima_protagonistas: 6,
-        edad_maxima_protagonistas: 10,
-        edad_minima_adulto: 22,
-      },
-    }),
-    prisma.rama.upsert({
-      where: { nombre: RAMAS.UNIDAD },
-      update: {},
-      create: {
-        nombre: RAMAS.UNIDAD,
-        edad_minima_protagonistas: 11,
-        edad_maxima_protagonistas: 13,
-        edad_minima_adulto: 22,
-      },
-    }),
-    prisma.rama.upsert({
-      where: { nombre: RAMAS.CAMINANTES },
-      update: {},
-      create: {
-        nombre: RAMAS.CAMINANTES,
-        edad_minima_protagonistas: 14,
-        edad_maxima_protagonistas: 17,
-        edad_minima_adulto: 25,
-      },
-    }),
-    prisma.rama.upsert({
-      where: { nombre: RAMAS.ROVER },
-      update: {},
-      create: {
-        nombre: RAMAS.ROVER,
-        edad_minima_protagonistas: 18,
-        edad_maxima_protagonistas: 22,
-        edad_minima_adulto: 30,
-      },
-    }),
-  ]);
+  return permissions;
+}
 
-  // Areas
-  const areas = await prisma.$transaction([
-    prisma.area.upsert({
-      where: { nombre: AREAS.JEFATURA },
-      update: {},
-      create: { nombre: AREAS.JEFATURA, descripcion: '' },
-    }),
-    prisma.area.upsert({
-      where: { nombre: AREAS.TESORERIA },
-      update: {},
-      create: { nombre: AREAS.TESORERIA, descripcion: '' },
-    }),
-    prisma.area.upsert({
-      where: { nombre: AREAS.SECRETARIA },
-      update: {},
-      create: { nombre: AREAS.SECRETARIA, descripcion: '' },
-    }),
-    prisma.area.upsert({
-      where: { nombre: AREAS.INTENDENCIA },
-      update: {},
-      create: { nombre: AREAS.INTENDENCIA, descripcion: '' },
-    }),
-    prisma.area.upsert({
-      where: { nombre: AREAS.RAMA },
-      update: {},
-      create: { nombre: AREAS.RAMA, descripcion: '' },
-    }),
-  ]);
+async function seedRoles(permissionIndex: Record<string, number>) {
+  for (const role of roleDefinitions) {
+    const roleRecord = await prisma.role.upsert({
+      where: { nombre: role.nombre },
+      update: { descripcion: role.descripcion },
+      create: { nombre: role.nombre, descripcion: role.descripcion },
+    });
 
-  // 6) Posiciones
-  const posiciones = await prisma.$transaction([
-    prisma.posicionArea.upsert({
-      where: { nombre: POSICIONES.JEFE },
-      update: {},
-      create: { nombre: POSICIONES.JEFE, descripcion: '' },
-    }),
-    prisma.posicionArea.upsert({
-      where: { nombre: POSICIONES.SUBJEFE },
-      update: {},
-      create: { nombre: POSICIONES.SUBJEFE, descripcion: '' },
-    }),
-    prisma.posicionArea.upsert({
-      where: { nombre: POSICIONES.SECRETARIO },
-      update: {},
-      create: { nombre: POSICIONES.SECRETARIO, descripcion: '' },
-    }),
-    prisma.posicionArea.upsert({
-      where: { nombre: POSICIONES.TESORERO },
-      update: {},
-      create: { nombre: POSICIONES.TESORERO, descripcion: '' },
-    }),
-    prisma.posicionArea.upsert({
-      where: { nombre: POSICIONES.AYUDANTE },
-      update: {},
-      create: { nombre: POSICIONES.AYUDANTE, descripcion: '' },
-    }),
-  ]);
+    for (const perm of role.permissions) {
+      const key = `${perm.resource}:${perm.action}`;
+      const permissionId = permissionIndex[key];
+      if (!permissionId) {
+        console.warn(`Permiso no encontrado para clave ${key}, omitiendo`);
+        continue;
+      }
 
-  // 4) Jefes de ramas
-  const adultos = await prisma.$transaction([
-    prisma.cuenta.upsert({
-      where: { user: 'margayp' },
-      update: {},
-      create: { user: 'margayp', password: 'margayp' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'koala' },
-      update: {},
-      create: { user: 'koala', password: 'koala' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'lobot' },
-      update: {},
-      create: { user: 'lobot', password: 'lobot' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'lobo' },
-      update: {},
-      create: { user: 'lobo', password: 'lobo' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'jirafa' },
-      update: {},
-      create: { user: 'jirafa', password: 'jirafa' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'zuricata' },
-      update: {},
-      create: { user: 'zuricata', password: 'zuricata' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'libelula' },
-      update: {},
-      create: { user: 'libelula', password: 'libelula' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'pandarojo' },
-      update: {},
-      create: { user: 'pandarojo', password: 'pandarojo' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'loris' },
-      update: {},
-      create: { user: 'loris', password: 'loris' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'ornitorrinco' },
-      update: {},
-      create: { user: 'ornitorrinco', password: 'ornitorrinco' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'quoka' },
-      update: {},
-      create: { user: 'quoka', password: 'quoka' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'colibri' },
-      update: {},
-      create: { user: 'colibri', password: 'colibri' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'lechuza' },
-      update: {},
-      create: { user: 'lechuza', password: 'lechuza' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'margay' },
-      update: {},
-      create: { user: 'marygay', password: 'margay' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'zorro' },
-      update: {},
-      create: { user: 'zorro', password: 'zorro' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'panteranegra' },
-      update: {},
-      create: { user: 'panteranegra', password: 'panteranegra' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'yagurundi' },
-      update: {},
-      create: { user: 'yagurundi', password: 'yagurundi' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'muercielago' },
-      update: {},
-      create: { user: 'muercielago', password: 'muercielago' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'erizo' },
-      update: {},
-      create: { user: 'erizo', password: 'erizo' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'gabi' },
-      update: {},
-      create: { user: 'gabi', password: 'gabi' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'milu' },
-      update: {},
-      create: { user: 'milu', password: 'milu' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'juli' },
-      update: {},
-      create: { user: 'juli', password: 'juli' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'leona' },
-      update: {},
-      create: { user: 'leona', password: 'leona' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'ornitorrincof' },
-      update: {},
-      create: { user: 'ornitorrincof', password: 'ornitorrincof' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'oso' },
-      update: {},
-      create: { user: 'oso', password: 'oso' },
-    }),
-    prisma.cuenta.upsert({
-      where: { user: 'mari' },
-      update: {},
-      create: { user: 'mari', password: 'mari' },
-    }),
-  ]);
+      await prisma.rolePermission.upsert({
+        where: {
+          id_role_id_permission: {
+            id_role: roleRecord.id,
+            id_permission: permissionId,
+          },
+        },
+        update: {},
+        create: {
+          id_role: roleRecord.id,
+          id_permission: permissionId,
+        },
+      });
+    }
+  }
+}
+
+async function main() {
+  const areaIndex = await seedAreas();
+  const areaRamaId = areaIndex[AREAS.RAMA];
+  if (!areaRamaId) {
+    throw new Error('No se encontró el área de RAMA para asignar a las ramas');
+  }
+
+  await seedRamas(areaRamaId);
+  const permissionIndex = await seedPermissions();
+  await seedRoles(permissionIndex);
+  console.log('Seed completado');
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
+  .catch((e) => {
     console.error(e);
-    await prisma.$disconnect();
     process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
   });

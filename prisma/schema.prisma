@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -633,12 +632,25 @@ enum RESOURCE {
   PROTAGONISTA
   ADULTO
   RESPONSABLE
+  AREA
+  RAMA
+  EVENTO
+  INSCRIPCION
   PAGO
+  PRESUPUESTO
+  INVENTARIO
+  PLAN_FORMACION
+  ASISTENCIA
+  CERTIFICADO
+  CUENTA_DINERO
+  LIBRO_ACTAS
+  LOG
+  ACTION
 }
 
 model Permission {
   id       Int      @id @default(autoincrement())
-  action   ACTION   @unique
+  action   ACTION
   resource RESOURCE
 
   // Relations
@@ -658,9 +670,6 @@ model RolePermission {
   id_role       Int
   id_permission Int
 
-  tipo_scope SCOPE
-  id_scope   Int? // FK a rama si aplica
-
   // Foreign key relations
   Role       Role       @relation(fields: [id_role], references: [id])
   Permission Permission @relation(fields: [id_permission], references: [id])
@@ -671,6 +680,8 @@ model RolePermission {
 model CuentaRole {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
+  tipo_scope SCOPE   @default(GLOBAL)
+  id_scope   Int?
 
   // Foreign keys
   id_cuenta Int
