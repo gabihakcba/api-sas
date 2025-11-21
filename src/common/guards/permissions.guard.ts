@@ -88,6 +88,12 @@ export class PermissionsGuard implements CanActivate {
       }
     }
 
+    // 4. Validación de Scope OWN
+    const hasOwn = matchingUserRoles.some((r) => r.scope === 'OWN');
+    if (hasOwn) {
+      request['useOwnScope'] = true;
+    }
+
     return true;
   }
 }

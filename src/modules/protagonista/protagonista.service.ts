@@ -65,16 +65,44 @@ export class ProtagonistaService {
     }
   }
 
-  async findAll(scopeId?: number) {
+  async findAll(user: any, scopeIds?: number[], useOwnScope?: boolean) {
     const where: any = {};
 
-    // Si nos llega un scopeId, filtramos por rama
-    if (scopeId) {
-      where.Miembro = {
-        MiembroRama: {
-          id_rama: scopeId
-        }
-      };
+    // Si no hay scopeIds ni useOwnScope, asumimos GLOBAL (o sin restricciones) -> Devuelve todo
+    // (El PermissionsGuard ya valida si tiene permiso GLOBAL, en cuyo caso no setea scopeIds ni useOwnScope)
+    if ((!scopeIds || scopeIds.length === 0) && !useOwnScope) {
+      // No filters
+    } else {
+      const conditions: any[] = [];
+
+      // Filtro por RAMA
+      if (scopeIds && scopeIds.length > 0) {
+        conditions.push({
+          Miembro: {
+            MiembroRama: {
+              id_rama: { in: scopeIds },
+            },
+          },
+        });
+      }
+
+      // Filtro por OWN
+      if (useOwnScope) {
+        const dependents = user.accountContext?.dependents || [];
+        const protagonistIds = dependents.map((d: any) => d.protagonistaId);
+        conditions.push({
+          id: { in: protagonistIds },
+        });
+      }
+
+      if (conditions.length > 0) {
+        where.OR = conditions;
+      } else {
+        // Si tiene flags pero no generó condiciones (ej: OWN pero sin dependientes),
+        // forzamos que no devuelva nada para seguridad.
+        // OJO: Si scopeIds venía vacío y useOwnScope true pero sin dependientes -> No devuelve nada.
+        where.id = -1; // Hack para no devolver nada
+      }
     }
 
     const protagonistas = await this.prismaService.protagonista.findMany({

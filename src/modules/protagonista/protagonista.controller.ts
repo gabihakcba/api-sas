@@ -27,8 +27,8 @@ export class ProtagonistaController {
   @Get()
   @RequirePermission(ACTION.READ, RESOURCE.PROTAGONISTA)
   findAll(@Req() req: any) {
-    const scopeId = req.scopeId;
-    return this.protagonistaService.findAll(scopeId);
+    const { user, scopeIds, useOwnScope } = req;
+    return this.protagonistaService.findAll(user, scopeIds, useOwnScope);
   }
 
   @Get(':id')
