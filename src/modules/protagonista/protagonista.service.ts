@@ -10,7 +10,7 @@ export class ProtagonistaService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly cuentaService: CuentaService,
-  ) {}
+  ) { }
 
   async create(createProtagonistaDto: CreateProtagonistaDto) {
     try {
@@ -64,8 +64,20 @@ export class ProtagonistaService {
     }
   }
 
-  async findAll() {
+  async findAll(scopeId?: number) {
+    const where: any = {};
+
+    // Si nos llega un scopeId, filtramos por rama
+    if (scopeId) {
+      where.Miembro = {
+        MiembroRama: {
+          id_rama: scopeId
+        }
+      };
+    }
+
     const protagonistas = await this.prismaService.protagonista.findMany({
+      where,
       include: {
         Miembro: {
           include: {

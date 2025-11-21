@@ -7,140 +7,54 @@ import {
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { PUBLICK_KEY } from 'src/common/constants/key-decorators';
-import {
-  AuthAccountContext,
-  DependentAccessContext,
-} from '../interfaces/auth-account-context.interface';
-import { CuentaService } from 'src/modules/cuenta/cuenta.service';
 import { AuthService } from '../auth.service';
-import { PrismaService } from 'src/modules/prisma/prisma.service';
-
-const isDependentAccessContext = (
-  value: unknown,
-): value is DependentAccessContext => {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-
-  const { cuentaId, miembroId, protagonistaId } = value as Record<
-    string,
-    unknown
-  >;
-
-  return (
-    typeof cuentaId === 'number' &&
-    typeof miembroId === 'number' &&
-    (protagonistaId === undefined || typeof protagonistaId === 'number')
-  );
-};
-
-const isAuthAccountContext = (value: unknown): value is AuthAccountContext => {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-
-  const { cuentaId, miembroId, protagonistaId, responsableId, dependents } =
-    value as Record<string, unknown>;
-
-  return (
-    typeof cuentaId === 'number' &&
-    (miembroId === undefined || typeof miembroId === 'number') &&
-    (protagonistaId === undefined || typeof protagonistaId === 'number') &&
-    (responsableId === undefined || typeof responsableId === 'number') &&
-    Array.isArray(dependents) &&
-    dependents.every(isDependentAccessContext)
-  );
-};
+import { AuthTokenPayload } from '../interfaces/auth-token-payload.interface';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
     private readonly authService: AuthService,
-    private readonly cuentaService: CuentaService,
-    private readonly prismaService: PrismaService,
     private readonly reflector: Reflector,
-  ) {}
+  ) { }
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    /**
-     * Chequeo si la ruta es pública
-     */
-    const isPublic = this.reflector.get<boolean>(
-      PUBLICK_KEY,
+    const isPublic = this.reflector.getAllAndOverride<boolean>(PUBLICK_KEY, [
       context.getHandler(),
-    );
+      context.getClass(),
+    ]);
+
     if (isPublic) {
       return true;
     }
 
-    /**
-     * Chequeo de token
-     */
     const request = context.switchToHttp().getRequest<Request>();
-    const authHeader = request.headers['authorization'];
+    const token = this.extractTokenFromHeader(request);
 
-    // Si no hay un header o es un array (tipo invalido)
-    if (!authHeader || Array.isArray(authHeader)) {
-      throw new UnauthorizedException(
-        'Token inválido: [Sin definir o tipo inesperado]',
-      );
+    if (!token) {
+      throw new UnauthorizedException('Token no encontrado');
     }
 
-    // Si no es Bearer o no hay token
-    const [scheme, token] = authHeader.split(' ');
-    if (scheme !== 'Bearer' || !token) {
-      throw new UnauthorizedException(
-        'Token inválido: [Formato esperado: Bearer <token>]',
-      );
+    try {
+      // Validamos y decodificamos el token
+      const payload = this.authService.useToken(token);
+
+      if (typeof payload === 'string') {
+        throw new UnauthorizedException();
+      }
+
+      // ⚠️ CRÍTICO: Inyectamos el payload completo (con roles y scopes) en la request
+      // Esto es lo que PermissionsGuard leerá después.
+      request['user'] = payload as AuthTokenPayload;
+
+    } catch (error) {
+      throw new UnauthorizedException('Token inválido o expirado');
     }
-
-    // Token no válido, expirado, con algoritmo diferente, etc
-    const manageToken = this.authService.useToken(token);
-    if (typeof manageToken === 'string') {
-      throw new UnauthorizedException(`Token inválido: [${manageToken}]`);
-    }
-
-    /**
-     * Chequeo de cuenta valida
-     */
-    const { sub } = manageToken;
-    const cuentaId = Number(sub);
-
-    if (!Number.isFinite(cuentaId)) {
-      throw new UnauthorizedException(
-        'Token inválido: identificador inesperado',
-      );
-    }
-
-    const cuenta = await this.cuentaService.findById(
-      this.prismaService,
-      cuentaId,
-    );
-
-    // Cuenta no encontrada
-    if (!cuenta) {
-      throw new UnauthorizedException(`Cuenta no encontrada: [${String(sub)}]`);
-    }
-
-    const rawAccountContext = await this.cuentaService.buildAuthAccountContext(
-      this.prismaService,
-      cuentaId,
-    );
-
-    if (
-      rawAccountContext !== null &&
-      !isAuthAccountContext(rawAccountContext)
-    ) {
-      throw new UnauthorizedException(
-        'Token inválido: contexto de cuenta inesperado',
-      );
-    }
-
-    const accountContext: AuthAccountContext | null = rawAccountContext;
-
-    request['id'] = manageToken.sub;
-    request['roles'] = manageToken.roles;
-    request['accountContext'] = accountContext ?? undefined;
 
     return true;
+  }
+
+  private extractTokenFromHeader(request: Request): string | undefined {
+    const [type, token] = request.headers.authorization?.split(' ') ?? [];
+    return type === 'Bearer' ? token : undefined;
   }
 }
