@@ -6,7 +6,7 @@ import {
   IsOptional,
   ValidateNested,
 } from 'class-validator';
-import { CreateMiembroDto } from 'src/miembro/dto/create-miembro.dto';
+import { CreateMiembroDto } from 'src/modules/miembro/dto/create-miembro.dto';
 
 export class CreateProtagonistaDto {
   @IsNotEmpty()

@@ -6,14 +6,14 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { PUBLICK_KEY } from 'src/constans/key-decorators';
+import { PUBLICK_KEY } from 'src/common/constants/key-decorators';
 import {
   AuthAccountContext,
   DependentAccessContext,
 } from '../interfaces/auth-account-context.interface';
-import { CuentaService } from 'src/cuenta/cuenta.service';
+import { CuentaService } from 'src/modules/cuenta/cuenta.service';
 import { AuthService } from '../auth.service';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from 'src/modules/prisma/prisma.service';
 
 const isDependentAccessContext = (
   value: unknown,

@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
 import { AuthTokenPayload } from './interfaces/auth-token-payload.interface';
@@ -10,6 +11,7 @@ export class AuthService {
   constructor(
     private readonly cuentaService: CuentaService,
     private readonly prismaService: PrismaService,
+    private readonly configService: ConfigService,
   ) {}
 
   public async validateUser(user: string, password: string) {
@@ -48,8 +50,17 @@ export class AuthService {
     }
   }
 
-  private getRefreshSecret() {
-    return (process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET) as string;
+  private getAccessSecret(): string {
+    const secret = this.configService.get<string>('JWT_SECRET');
+    if (!secret) {
+      throw new Error('JWT_SECRET is not configured');
+    }
+    return secret;
+  }
+
+  private getRefreshSecret(): string {
+    const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
+    return refreshSecret ?? this.getAccessSecret();
   }
 
   private buildTokens({
@@ -77,7 +88,7 @@ export class AuthService {
     return {
       access_token: this.signJwt({
         payload: payload as unknown as jwt.JwtPayload,
-        secret: process.env.JWT_SECRET as string,
+        secret: this.getAccessSecret(),
         expiresIn: '30d',
       }),
       refresh_token: this.signJwt({
@@ -134,7 +145,7 @@ export class AuthService {
 
   public useToken(
     token: string,
-    secret: string = process.env.JWT_SECRET as string,
+    secret: string = this.getAccessSecret(),
   ): AuthTokenPayload | string {
     try {
       const decoded = jwt.verify(token, secret);

@@ -6,28 +6,28 @@
 
 generator client {
   provider = "prisma-client-js"
-  // output   = "../generated/prisma"
+  output   = "../generated/prisma"
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-/**
- * MODELOS
- */
+//
+// MODELOS
+ //
 
-/**
- * Tablas relacionas a informacion basica de los usuarios:
- * @Cuenta
- * @Miembro
- * @Protagonista
- * @Adulto
- * @Responsable
- * @Relacion
- * @Responsabilidad
- */
+//
+// Tablas relacionas a informacion basica de los usuarios:
+// @Cuenta
+// @Miembro
+// @Protagonista
+// @Adulto
+// @Responsable
+// @Relacion
+// @Responsabilidad
+ //
 model Cuenta {
   id       Int    @id @default(autoincrement())
   user     String @unique
@@ -160,15 +160,15 @@ model Responsabilidad {
   Responsable  Responsable  @relation(fields: [id_responsable], references: [id], name: "ResponsabilidadResponsable")
 }
 
-/**
- * Tablas para Areas
- * @Area
- * @Rama (Subarea)
- * @EquipoArea
- * @Rama
- * @PosicionArea
- * @MiembroRama
- */
+//
+// Tablas para Areas
+// @Area
+// @Rama (Subarea)
+// @EquipoArea
+// @Rama
+// @PosicionArea
+// @MiembroRama
+ //
 
 model Area {
   id          Int     @id @default(autoincrement())
@@ -256,15 +256,15 @@ model MiembroRama {
   Rama    Rama    @relation(fields: [id_rama], references: [id], name: "MiembroRamaRama")
 }
 
-/**
- * Tablas para eventos y actividades
- * @Evento
- * @TipoEvento
- * @Comision
- * @ParticipantesComision
- * @AreaAfectada
- * @InscripcionEvento
- */
+//
+// Tablas para eventos y actividades
+// @Evento
+// @TipoEvento
+// @Comision
+// @ParticipantesComision
+// @AreaAfectada
+// @InscripcionEvento
+ //
 model Evento {
   id             Int      @id @default(autoincrement())
   nombre         String
@@ -372,13 +372,13 @@ model InscripcionEvento {
   formacionAdultosId Int?
 }
 
-/**
- * Tablas para manejo de pagos
- * @Pago
- * @ConceptoPago
- * @MetodoPago
- * @CuentaDinero
- */
+//
+// Tablas para manejo de pagos
+// @Pago
+// @ConceptoPago
+// @MetodoPago
+// @CuentaDinero
+ //
 model Pago {
   id         Int      @id @default(autoincrement())
   monto      Float
@@ -449,12 +449,12 @@ model CuentaDinero {
   Pago Pago[] @relation(name: "PagoCuentaDinero")
 }
 
-/**
- * Tablas para formaciones de adultos
- * @PlanFormacion
- * @FormacionAdultos
- * @Certificado
- */
+//
+// Tablas para formaciones de adultos
+// @PlanFormacion
+// @FormacionAdultos
+// @Certificado
+ //
 model PlanFormacion {
   id          Int     @id @default(autoincrement())
   titulo      String
@@ -513,12 +513,12 @@ model Certificado {
   FormacionAdultos FormacionAdultos[] @relation(name: "FormacionAdultosCertificado")
 }
 
-/**
- * Tablas para consejo
- * @Consejo
- * @AsistenciaConsejo
- * @TemarioConsejo
- */
+//
+// Tablas para consejo
+// @Consejo
+// @AsistenciaConsejo
+// @TemarioConsejo
+ //
 model Consejo {
   id           Int       @id @default(autoincrement())
   nombre       String
@@ -573,10 +573,10 @@ model TemarioConsejo {
   Consejo Consejo @relation(fields: [id_consejo], references: [id], name: "TemarioConsejoConsejo")
 }
 
-/**
- * Tablas para rastreo y mantenimiento
- * @Logs
- */
+//
+// Tablas para rastreo y mantenimiento
+// @Logs
+ //
 model Log {
   id        Int      @id @default(autoincrement())
   cuenta    Json
@@ -602,13 +602,13 @@ model Action {
   Log Log @relation(fields: [id_log], references: [id], name: "ActionLog")
 }
 
-/**
- * Tablas para permisos y roles
- * @Role
- * @Permission
- * @RolePermission
- * @CuentaRole
- */
+//
+// Tablas para permisos y roles
+// @Role
+// @Permission
+// @RolePermission
+// @CuentaRole
+ //
 model Role {
   id          Int     @id @default(autoincrement())
   nombre      String  @unique // ADM - DEV - OWN

@@ -1,21 +1,29 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { AuthAccountContext } from 'src/auth/interfaces/auth-account-context.interface';
+import { AuthAccountContext } from 'src/modules/auth/interfaces/auth-account-context.interface';
 import { CreateCuentaDto } from './dto/create-cuenta.dto';
 import { UpdateCuentaDto } from './dto/update-cuenta.dto';
-import { Tx } from 'src/prisma/types/prisma';
+import { Tx } from 'src/modules/prisma/types/prisma';
 import { Cuenta, CuentaWithRole } from './types/cuenta';
 
 @Injectable()
 export class CuentaService {
+  private readonly hashSalt: number;
+
+  constructor(private readonly configService: ConfigService) {
+    this.hashSalt = this.configService.get<number>('HASH_SALT') ?? 10;
+  }
+
+  async hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, this.hashSalt);
+  }
+
   async create(tx: Tx, createCuentaDto: CreateCuentaDto): Promise<Cuenta> {
     try {
       const { user, password } = createCuentaDto;
-      const hashedPassword = await bcrypt.hash(
-        password,
-        Number(process.env.HASH_SALT),
-      );
+      const hashedPassword = await this.hashPassword(password);
 
       const cuenta = await tx.cuenta.create({
         data: { user, password: hashedPassword },
@@ -196,10 +204,7 @@ export class CuentaService {
       }
 
       if (updateCuentaDto.password !== undefined) {
-        data.password = await bcrypt.hash(
-          updateCuentaDto.password,
-          Number(process.env.HASH_SALT),
-        );
+        data.password = await this.hashPassword(updateCuentaDto.password);
       }
 
       if (Object.keys(data).length === 0) {

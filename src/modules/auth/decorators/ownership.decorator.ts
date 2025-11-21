@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import { OWNERSHIP_KEY } from 'src/constans/key-decorators';
+import { OWNERSHIP_KEY } from 'src/common/constants/key-decorators';
 
 export type OwnershipEntity = 'cuenta' | 'miembro' | 'protagonista';
 export type OwnershipSource = 'params' | 'body' | 'query';

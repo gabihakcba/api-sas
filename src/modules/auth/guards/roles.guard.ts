@@ -1,8 +1,8 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { OWNERSHIP_KEY, ROLES_KEY } from 'src/constans/key-decorators';
-import { ROLES } from 'src/constans/db/roles';
+import { OWNERSHIP_KEY, ROLES_KEY } from 'src/common/constants/key-decorators';
+import { ROLES } from 'src/common/constants/db/roles';
 import { OwnershipRequirement } from '../decorators/ownership.decorator';
 import { AuthAccountContext } from '../interfaces/auth-account-context.interface';
 

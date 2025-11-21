@@ -1,4 +1,4 @@
-import { Cuenta } from 'src/cuenta/types/cuenta';
+import { Cuenta } from 'src/modules/cuenta/types/cuenta';
 
 export type Miembro = {
   id: number;

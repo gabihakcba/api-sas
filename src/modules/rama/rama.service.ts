@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CreateRamaDto } from './dto/create-rama.dto';
 import { UpdateRamaDto } from './dto/update-rama.dto';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from 'src/modules/prisma/prisma.service';
 
 @Injectable()
 export class RamaService {

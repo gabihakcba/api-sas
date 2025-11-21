@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { CreateProtagonistaDto } from './dto/create-protagonista.dto';
 import { UpdateProtagonistaDto } from './dto/update-protagonista.dto';
 import { PrismaClient } from '@prisma/client';
-import { CuentaService } from 'src/cuenta/cuenta.service';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { CuentaService } from 'src/modules/cuenta/cuenta.service';
+import { PrismaService } from 'src/modules/prisma/prisma.service';
 
 @Injectable()
 export class ProtagonistaService {

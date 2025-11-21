@@ -1,10 +1,10 @@
 // prisma/seed.ts
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { AREAS } from 'src/constans/db/areas';
-import { POSICIONES } from 'src/constans/db/posiciones';
-import { RAMAS } from 'src/constans/db/ramas';
-import { ROLES } from 'src/constans/db/roles';
+import { AREAS } from 'src/common/constants/db/areas';
+import { POSICIONES } from 'src/common/constants/db/posiciones';
+import { RAMAS } from 'src/common/constants/db/ramas';
+import { ROLES } from 'src/common/constants/db/roles';
 
 const prisma = new PrismaClient();
 

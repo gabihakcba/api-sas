@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { instanceToPlain } from 'class-transformer';
 import { Prisma } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
 import { CreateMiembroDto } from './dto/create-miembro.dto';
 import { UpdateMiembroDto } from './dto/update-miembro.dto';
-import { CuentaService } from 'src/cuenta/cuenta.service';
+import { CuentaService } from 'src/modules/cuenta/cuenta.service';
 import { Miembro } from './types/miembro';
 
 type Tx = Prisma.TransactionClient;
@@ -108,9 +107,8 @@ export class MiembroService {
         }
 
         if (plainCuenta?.password !== undefined) {
-          cuentaData.password = await bcrypt.hash(
+          cuentaData.password = await this.cuentaService.hashPassword(
             plainCuenta.password,
-            Number(process.env.HASH_SALT),
           );
         }
 
