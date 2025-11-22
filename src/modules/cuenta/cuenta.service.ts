@@ -65,6 +65,8 @@ export class CuentaService {
                   descripcion: true,
                 },
               },
+              tipo_scope: true,
+              id_scope: true,
             },
           },
         },
@@ -160,12 +162,19 @@ export class CuentaService {
     };
   }
 
-  async findByUser(prisma: Tx, user: string) {
+  async findByUser(prisma: Tx, identifier: string) {
     try {
-      return await prisma.cuenta.findUniqueOrThrow({
-        where: { user },
+      return await prisma.cuenta.findFirstOrThrow({
+        where: {
+          borrado: false,
+          OR: [
+            { user: identifier },
+            { Miembro: { email: identifier } },
+          ],
+        },
         select: {
           id: true,
+          user: true,
           password: true,
           borrado: true,
           createdAt: true,

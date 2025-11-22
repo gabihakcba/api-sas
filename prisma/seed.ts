@@ -1,4 +1,5 @@
-import { ACTION, PrismaClient, RESOURCE } from '@prisma/client';
+import { ACTION, PrismaClient, RESOURCE, SCOPE } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { AREAS } from '../src/common/constants/db/areas';
 import { RAMAS } from '../src/common/constants/db/ramas';
 
@@ -29,12 +30,12 @@ const ramaSeeds: Array<{
     {
       nombre: RAMAS.MANADA,
       edad_minima_protagonistas: 6,
-      edad_maxima_protagonistas: 10,
+      edad_maxima_protagonistas: 9,
       edad_minima_adulto: 22,
     },
     {
       nombre: RAMAS.UNIDAD,
-      edad_minima_protagonistas: 11,
+      edad_minima_protagonistas: 10,
       edad_maxima_protagonistas: 13,
       edad_minima_adulto: 22,
     },
@@ -233,6 +234,82 @@ async function seedRoles(permissionIndex: Record<string, number>) {
   }
 }
 
+async function seedAdmin() {
+  const superAdminRole = await prisma.role.findUnique({
+    where: { nombre: 'SUPER_ADMIN' },
+  });
+
+  if (!superAdminRole) {
+    throw new Error('Rol SUPER_ADMIN no encontrado');
+  }
+
+  const hashedPassword = await bcrypt.hash('Playadito97#', 10);
+
+  const cuenta = await prisma.cuenta.upsert({
+    where: { user: 'gabrielhakcba@gmail.com' },
+    update: { password: hashedPassword },
+    create: {
+      user: 'gabrielhakcba@gmail.com',
+      password: hashedPassword,
+    },
+  });
+
+  const miembro = await prisma.miembro.upsert({
+    where: { dni: '40684496' },
+    update: {
+      nombre: 'Roberto Gabriel',
+      apellidos: 'Hak',
+      fecha_nacimiento: new Date('1997-09-27'),
+      direccion: 'Obispo Trejo 832',
+      email: 'gabrielhakcba@gmail.com',
+      telefono: '3517722667',
+      telefono_emergencia: '3517722667',
+      id_cuenta: cuenta.id,
+    },
+    create: {
+      nombre: 'Roberto Gabriel',
+      apellidos: 'Hak',
+      dni: '40684496',
+      fecha_nacimiento: new Date('1997-09-27'),
+      direccion: 'Obispo Trejo 832',
+      email: 'gabrielhakcba@gmail.com',
+      telefono: '3517722667',
+      telefono_emergencia: '3517722667',
+      id_cuenta: cuenta.id,
+    },
+  });
+
+  await prisma.adulto.upsert({
+    where: { id_miembro: miembro.id },
+    update: {
+      activo: true,
+      es_becado: false,
+    },
+    create: {
+      id_miembro: miembro.id,
+      activo: true,
+      es_becado: false,
+    },
+  });
+
+  const existingRole = await prisma.cuentaRole.findFirst({
+    where: {
+      id_cuenta: cuenta.id,
+      id_role: superAdminRole.id,
+    },
+  });
+
+  if (!existingRole) {
+    await prisma.cuentaRole.create({
+      data: {
+        id_cuenta: cuenta.id,
+        id_role: superAdminRole.id,
+        tipo_scope: SCOPE.GLOBAL,
+      },
+    });
+  }
+}
+
 async function main() {
   const areaIndex = await seedAreas();
   const areaRamaId = areaIndex[AREAS.RAMA];
@@ -243,6 +320,7 @@ async function main() {
   await seedRamas(areaRamaId);
   const permissionIndex = await seedPermissions();
   await seedRoles(permissionIndex);
+  await seedAdmin();
   console.log('Seed completado');
 }
 

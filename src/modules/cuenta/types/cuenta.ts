@@ -15,5 +15,7 @@ export type CuentaWithRole = Cuenta & {
       nombre: string;
       descripcion: string | null;
     };
+    tipo_scope: 'GLOBAL' | 'RAMA' | 'OWN' | 'GRUPO';
+    id_scope: number | null;
   }>;
 };

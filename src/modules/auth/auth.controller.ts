@@ -16,7 +16,7 @@ export class AuthController {
     if (!cuentaValidate) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    const jwt = await this.authService.generateJwt(user);
+    const jwt = await this.authService.generateJwt(cuentaValidate);
     return jwt;
   }
 

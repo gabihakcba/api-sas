@@ -1,4 +1,5 @@
 import { type Cuenta } from '@prisma/client';
+import { CuentaWithRole } from '../cuenta/types/cuenta';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -11,7 +12,7 @@ export interface JwtPayload {
   username: string;
   roles: Array<{
     name: string;
-    scope: 'GLOBAL' | 'RAMA' | 'OWN';
+    scope: 'GLOBAL' | 'RAMA' | 'OWN' | 'GRUPO';
     scopeId?: number | null;
   }>;
 }
@@ -24,7 +25,7 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) { }
 
-  public async validateUser(user: string, password: string) {
+  public async validateUser(user: string, password: string): Promise<CuentaWithRole | null> {
     const cuenta = await this.cuentaService.findByUser(
       this.prismaService,
       user,
@@ -32,7 +33,7 @@ export class AuthService {
     if (cuenta) {
       const isMatch = await bcrypt.compare(password, cuenta.password);
       if (isMatch) {
-        return cuenta;
+        return cuenta as unknown as CuentaWithRole;
       }
     }
 
@@ -72,11 +73,11 @@ export class AuthService {
     return refreshSecret ?? this.getAccessSecret();
   }
 
-  private buildTokens(cuenta: any) {
+  private buildTokens(cuenta: CuentaWithRole) {
     const payload: JwtPayload = {
       sub: cuenta.id,
       username: cuenta.user,
-      roles: cuenta.CuentaRole.map((cr: any) => ({
+      roles: cuenta.CuentaRole.map((cr) => ({
         name: cr.Role.nombre,
         scope: cr.tipo_scope,
         scopeId: cr.id_scope,
@@ -87,7 +88,7 @@ export class AuthService {
       access_token: this.signJwt({
         payload: payload as unknown as jwt.JwtPayload,
         secret: this.getAccessSecret(),
-        expiresIn: '30d',
+        expiresIn: '15m',
       }),
       refresh_token: this.signJwt({
         payload: payload as unknown as jwt.JwtPayload,
@@ -97,15 +98,8 @@ export class AuthService {
     };
   }
 
-  public async generateJwt(user: string) {
-    const cuenta = await this.cuentaService.findByUser(
-      this.prismaService,
-      user,
-    );
-    if (cuenta) {
-      return this.buildTokens(cuenta);
-    }
-    return null;
+  public async generateJwt(cuenta: CuentaWithRole) {
+    return this.buildTokens(cuenta);
   }
 
   public async refreshTokens(refreshToken: string) {
@@ -152,7 +146,7 @@ export class AuthService {
         !Array.isArray(roles) ||
         typeof username !== 'string'
       ) {
-        throw new UnauthorizedException('Token inválido: payload inesperado');
+        throw new UnauthorizedException('Token inválido: payload inesperado <bad type>');
       }
 
       const validatedRoles = roles.filter((role): role is any => {
@@ -165,7 +159,7 @@ export class AuthService {
       });
 
       if (validatedRoles.length !== roles.length) {
-        throw new UnauthorizedException('Token inválido: payload inesperado');
+        throw new UnauthorizedException('Token inválido: payload inesperado <bad roles>');
       }
 
       return {
@@ -186,7 +180,7 @@ export class AuthService {
       } else if (error instanceof jwt.JsonWebTokenError) {
         throw new UnauthorizedException(`Token inválido: ${error.message}`);
       } else {
-        throw new UnauthorizedException(`Token inválido inesperado`);
+        throw new UnauthorizedException(`Token inválido inesperado: ${error.message}`);
       }
     }
   }
