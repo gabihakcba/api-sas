@@ -1,0 +1,746 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+//
+// MODELOS
+//
+
+//
+// Tablas relacionas a informacion basica de los usuarios:
+// @Cuenta
+// @Miembro
+// @Protagonista
+// @Adulto
+// @Responsable
+// @Relacion
+// @Responsabilidad
+//
+model Cuenta {
+  id       Int    @id @default(autoincrement())
+  user     String @unique
+  password String
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  Miembro    Miembro?     @relation(name: "MiembroCuenta")
+  CuentaRole CuentaRole[] @relation(name: "CuentaRole")
+}
+
+model Miembro {
+  id                  Int      @id @default(autoincrement())
+  nombre              String
+  apellidos           String
+  dni                 String   @unique
+  fecha_nacimiento    DateTime
+  direccion           String
+  email               String?  @unique
+  telefono            String?
+  telefono_emergencia String
+  totem               String?
+  cualidad            String?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_cuenta Int @unique
+
+  // Foreign key relations
+  Cuenta Cuenta @relation(fields: [id_cuenta], references: [id], name: "MiembroCuenta")
+
+  // Relations
+  Protagonista          Protagonista?           @relation(name: "MiembroProtagnista")
+  Adulto                Adulto?                 @relation(name: "MiembroAdulto")
+  Responsable           Responsable?            @relation(name: "MiembroResponsable")
+  MiembroRama           MiembroRama[]           @relation(name: "MiembroRamaMiembro")
+  ParticipantesComision ParticipantesComision[] @relation(name: "ParticipantesComisionMiembro")
+  InscripcionEvento     InscripcionEvento[]     @relation(name: "InscripcionEventoMiembro")
+  Pago                  Pago[]                  @relation(name: "PagoMiembro")
+  AsistenciaConsejo     AsistenciaConsejo[]     @relation(name: "AsistenciaMiembro")
+  CuentaDinero          CuentaDinero[]          @relation(name: "CuentaMiembro")
+}
+
+model Protagonista {
+  id        Int     @id @default(autoincrement())
+  es_becado Boolean @default(false)
+  activo    Boolean @default(true)
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_miembro Int @unique
+
+  // Foreign key relations
+  Miembro Miembro @relation(fields: [id_miembro], references: [id], name: "MiembroProtagnista")
+
+  // Relations
+  Responsabilidad Responsabilidad[] @relation(name: "ResponsabilidadProtagonista")
+}
+
+model Adulto {
+  id        Int     @id @default(autoincrement())
+  es_becado Boolean @default(false)
+  activo    Boolean @default(true)
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_miembro Int @unique
+
+  // Foreign key relations
+  Miembro Miembro @relation(fields: [id_miembro], references: [id], name: "MiembroAdulto")
+
+  // Relations
+  EquipoArea       EquipoArea[]       @relation(name: "EquipoAreaAdulto")
+  FormacionAdultos FormacionAdultos[] @relation(name: "FormacionAdultosAdulto")
+  Certificado      Certificado[]      @relation(name: "CertificadoAdulto")
+}
+
+model Responsable {
+  id Int @id @default(autoincrement())
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_miembro Int @unique
+
+  // Foreign key relations
+  Miembro Miembro @relation(fields: [id_miembro], references: [id], name: "MiembroResponsable")
+
+  // Relations
+  Responsabilidad Responsabilidad[] @relation(name: "ResponsabilidadResponsable")
+}
+
+model Relacion {
+  id          Int     @id @default(autoincrement())
+  tipo        String // Madre - Padre - Abuelo - Tutor ...
+  descripcion String?
+
+  // Relations
+  Responsabilidad Responsabilidad[] @relation(name: "ResponsabilidadRelacion")
+}
+
+model Responsabilidad {
+  id Int @id @default(autoincrement())
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_protagonista Int
+  id_responsable  Int
+  id_relacion     Int
+
+  // Foreign keys relations
+  Protagonista Protagonista @relation(fields: [id_protagonista], references: [id], name: "ResponsabilidadProtagonista")
+  Responsable  Responsable  @relation(fields: [id_responsable], references: [id], name: "ResponsabilidadResponsable")
+  Relacion     Relacion     @relation(fields: [id_relacion], references: [id], name: "ResponsabilidadRelacion")
+
+  @@unique([id_protagonista, id_responsable])
+}
+
+//
+// Tablas para Areas
+// @Area
+// @Rama (Subarea)
+// @EquipoArea
+// @Rama
+// @PosicionArea
+// @MiembroRama
+//
+
+model Area {
+  id          Int     @id @default(autoincrement())
+  nombre      String  @unique // Jefatura - Tesoreria - Secretaria - Intendencia - Rama
+  descripcion String?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  EquipoArea    EquipoArea[]    @relation(name: "EquipoAreaArea")
+  AreaAfectada  AreaAfectada[]  @relation(name: "AreaAfectadaArea")
+  CuentaDinero  CuentaDinero[]  @relation(name: "CuentaArea")
+  PlanFormacion PlanFormacion[] @relation(name: "PlanFormacionArea")
+  Rama          Rama[]          @relation(name: "RamaArea")
+}
+
+model EquipoArea {
+  id           Int       @id @default(autoincrement())
+  fecha_inicio DateTime
+  fecha_fin    DateTime?
+  activo       Boolean   @default(true)
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_area     Int
+  id_adulto   Int
+  id_posicion Int
+  id_rama     Int?
+
+  // Foreign key relations
+  Area     Area         @relation(fields: [id_area], references: [id], name: "EquipoAreaArea")
+  Adulto   Adulto       @relation(fields: [id_adulto], references: [id], name: "EquipoAreaAdulto")
+  Posicion PosicionArea @relation(fields: [id_posicion], references: [id], name: "EquipoAreaPosicionArea")
+  Rama     Rama?        @relation(fields: [id_rama], references: [id], name: "EquipoAreaRama")
+}
+
+model Rama {
+  id                        Int     @id @default(autoincrement())
+  nombre                    String  @unique // Castores - Manada - Unidad - Caminantes - Rovers
+  descripcion               String?
+  edad_minima_protagonistas Int
+  edad_maxima_protagonistas Int
+  edad_minima_adulto        Int
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_area Int
+
+  // Foreign key relations
+  Area Area @relation(fields: [id_area], references: [id], name: "RamaArea")
+
+  // Relations
+  MiembroRama  MiembroRama[]  @relation(name: "MiembroRamaRama")
+  EquipoArea   EquipoArea[]   @relation(name: "EquipoAreaRama")
+  CuentaDinero CuentaDinero[] @relation(name: "CuentaRama")
+  RamaAfectada RamaAfectada[] @relation(name: "RamaAfectadaRama")
+}
+
+model PosicionArea {
+  id          Int     @id @default(autoincrement())
+  nombre      String  @unique // Jefe - Subjefe - Secretario - Tesorero - Ayudante
+  descripcion String?
+
+  // Relations
+  EquipoArea EquipoArea[] @relation(name: "EquipoAreaPosicionArea")
+}
+
+model MiembroRama {
+  id         Int @id @default(autoincrement())
+  id_miembro Int
+  id_rama    Int
+
+  fecha_ingreso DateTime  @default(now())
+  fecha_egreso  DateTime?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign key relations
+  Miembro Miembro @relation(fields: [id_miembro], references: [id], name: "MiembroRamaMiembro")
+  Rama    Rama    @relation(fields: [id_rama], references: [id], name: "MiembroRamaRama")
+}
+
+//
+// Tablas para eventos y actividades
+// @Evento
+// @TipoEvento
+// @Comision
+// @ParticipantesComision
+// @AreaAfectada
+// @InscripcionEvento
+//
+model Evento {
+  id             Int      @id @default(autoincrement())
+  nombre         String
+  descripcion    String?
+  fecha_inicio   DateTime
+  fecha_fin      DateTime
+  lugar          String?
+  terminado      Boolean  @default(false)
+  costo_mp       Decimal  @db.Decimal(15, 2)
+  costo_ma       Decimal  @db.Decimal(15, 2)
+  costo_ayudante Decimal  @db.Decimal(15, 2)
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_tipo Int
+
+  // Foreign key relations
+  TipoEvento TipoEvento @relation(fields: [id_tipo], references: [id], name: "EventoTipoEvento")
+
+  // Relations
+  Comision          Comision[]          @relation(name: "ComisionEvento")
+  AreaAfectada      AreaAfectada[]      @relation(name: "AreaAfectadaEvento")
+  RamaAfectada      RamaAfectada[]      @relation(name: "RamaAfectadaEvento")
+  InscripcionEvento InscripcionEvento[] @relation(name: "InscripcionEventoEvento")
+  Pago              Pago[]              @relation(name: "PagoEvento")
+}
+
+model TipoEvento {
+  id          Int     @id @default(autoincrement())
+  nombre      String // Campamento - Salida cercana - RAID - Rally - Acantonamiento
+  descripcion String?
+  borrado     Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  // Relations
+  Evento Evento[] @relation(name: "EventoTipoEvento")
+}
+
+model Comision {
+  id          Int     @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign key
+  id_evento Int?
+
+  // Foreign key relations
+  Evento Evento? @relation(fields: [id_evento], references: [id], name: "ComisionEvento")
+
+  // Relations
+  ParticipantesComision ParticipantesComision[] @relation(name: "ParticipantesComisionComision")
+}
+
+model ParticipantesComision {
+  id           Int       @id @default(autoincrement())
+  fecha_inicio DateTime  @default(now())
+  fecha_fin    DateTime?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_comision Int
+  id_miembro  Int
+
+  // Foreign key relations
+  Comision Comision @relation(fields: [id_comision], references: [id], name: "ParticipantesComisionComision")
+  Miembro  Miembro  @relation(fields: [id_miembro], references: [id], name: "ParticipantesComisionMiembro")
+}
+
+model AreaAfectada {
+  id Int @id @default(autoincrement())
+
+  // Foreign keys
+  id_evento Int
+  id_area   Int
+
+  // Foreign key relations
+  Evento Evento @relation(fields: [id_evento], references: [id], name: "AreaAfectadaEvento")
+  Area   Area   @relation(fields: [id_area], references: [id], name: "AreaAfectadaArea")
+}
+
+model RamaAfectada {
+  id Int @id @default(autoincrement())
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_evento Int
+  id_rama   Int
+
+  // Foreign key relations
+  Evento Evento @relation(fields: [id_evento], references: [id], name: "RamaAfectadaEvento")
+  Rama   Rama   @relation(fields: [id_rama], references: [id], name: "RamaAfectadaRama")
+}
+
+model InscripcionEvento {
+  id              Int     @id @default(autoincrement())
+  descripcion     String?
+  asistio         Boolean @default(false)
+  pagado          Boolean @default(false)
+  monto_total     Decimal @default(0) @db.Decimal(15, 2)
+  saldo_pendiente Decimal @default(0) @db.Decimal(15, 2)
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_evento  Int
+  id_miembro Int
+
+  // Foreign key relations
+  Evento  Evento  @relation(fields: [id_evento], references: [id], name: "InscripcionEventoEvento")
+  Miembro Miembro @relation(fields: [id_miembro], references: [id], name: "InscripcionEventoMiembro")
+}
+
+//
+// Tablas para manejo de pagos
+// @Pago
+// @ConceptoPago
+// @MetodoPago
+// @CuentaDinero
+//
+model Pago {
+  id                Int      @id @default(autoincrement())
+  monto             Decimal  @db.Decimal(15, 2)
+  detalles          String?
+  fecha_pago        DateTime @default(now())
+  codigo_validacion String   @unique @default(uuid())
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_cuenta_dinero Int
+  id_metodo_pago   Int
+  id_concepto_pago Int
+  id_evento        Int?
+  id_miembro       Int
+  id_cuenta_origen Int?
+
+  // Foreign key relations
+  CuentaDinero CuentaDinero  @relation(fields: [id_cuenta_dinero], references: [id], name: "PagoCuentaDinero")
+  MetodoPago   MetodoPago    @relation(fields: [id_metodo_pago], references: [id], name: "PagoMetodoPago")
+  ConceptoPago ConceptoPago  @relation(fields: [id_concepto_pago], references: [id], name: "PagoConceptoPago")
+  Evento       Evento?       @relation(fields: [id_evento], references: [id], name: "PagoEvento")
+  Miembro      Miembro       @relation(fields: [id_miembro], references: [id], name: "PagoMiembro")
+  CuentaOrigen CuentaDinero? @relation(fields: [id_cuenta_origen], references: [id], name: "PagoCuentaOrigen")
+}
+
+model ConceptoPago {
+  id          Int     @id @default(autoincrement())
+  nombre      String // Afiliacion - Cuota - Evento
+  descripcion String?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  Pago Pago[] @relation(name: "PagoConceptoPago")
+}
+
+model MetodoPago {
+  id          Int     @id @default(autoincrement())
+  nombre      String // Transferencia - Efectivo - Debito - Cheque
+  descripcion String?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  Pago Pago[] @relation(name: "PagoMetodoPago")
+}
+
+model CuentaDinero {
+  id           Int     @id @default(autoincrement())
+  nombre       String // Efectivo - Banco
+  descripcion  String? // Numero de cuenta - Caja personal
+  monto_actual Decimal @default(0) @db.Decimal(15, 2)
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_area    Int?
+  id_rama    Int?
+  id_miembro Int?
+
+  // Foreign key relations
+  Area    Area?    @relation(fields: [id_area], references: [id], name: "CuentaArea")
+  Rama    Rama?    @relation(fields: [id_rama], references: [id], name: "CuentaRama")
+  Miembro Miembro? @relation(fields: [id_miembro], references: [id], name: "CuentaMiembro")
+
+  // Relations
+  Pago       Pago[] @relation(name: "PagoCuentaDinero")
+  PagoOrigen Pago[] @relation(name: "PagoCuentaOrigen")
+}
+
+//
+// Tablas para formaciones de adultos
+// @PlanFormacion
+// @FormacionAdultos
+// @Certificado
+//
+model PlanFormacion {
+  id          Int     @id @default(autoincrement())
+  titulo      String
+  descripcion String?
+  nivel       Int? // 1 - 2 - 3
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_area Int
+
+  // Foreign key relations
+  Area             Area               @relation(fields: [id_area], references: [id], name: "PlanFormacionArea")
+  FormacionAdultos FormacionAdultos[] @relation(name: "FormacionAdultosPlanFormacion")
+}
+
+model FormacionAdultos {
+  id          Int     @id @default(autoincrement())
+  descripcion String?
+  estado      String? // En curso - pendiente - terminado
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_adulto         Int
+  id_plan_formacion Int
+  id_certificado    Int
+
+  // Foreign key relations
+  Adulto        Adulto        @relation(fields: [id_adulto], references: [id], name: "FormacionAdultosAdulto")
+  PlanFormacion PlanFormacion @relation(fields: [id_plan_formacion], references: [id], name: "FormacionAdultosPlanFormacion")
+  Certificado   Certificado   @relation(fields: [id_certificado], references: [id], name: "FormacionAdultosCertificado")
+}
+
+model Certificado {
+  id          Int     @id @default(autoincrement())
+  titulo      String
+  descripcion String?
+  url         String?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_adulto Int
+
+  // Foreign key relations
+  Adulto Adulto @relation(fields: [id_adulto], references: [id], name: "CertificadoAdulto")
+
+  // Relations
+  FormacionAdultos FormacionAdultos[] @relation(name: "FormacionAdultosCertificado")
+}
+
+//
+// Tablas para consejo
+// @Consejo
+// @AsistenciaConsejo
+// @TemarioConsejo
+//
+model Consejo {
+  id           Int       @id @default(autoincrement())
+  nombre       String
+  descripcion  String?
+  fecha        DateTime  @default(now())
+  es_ordinario Boolean   @default(true)
+  hora_inicio  DateTime?
+  hora_fin     DateTime?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  AsistenciaConsejo AsistenciaConsejo[] @relation(name: "AsistenciaConsejoConsejo")
+  TemarioConsejo    TemarioConsejo[]    @relation(name: "TemarioConsejoConsejo")
+}
+
+model AsistenciaConsejo {
+  id          Int    @id @default(autoincrement())
+  descripcion String // Representante adulto - Representante juvenil - Invitado
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_consejo Int
+  id_miembro Int
+
+  // Foreign key relations
+  Consejo Consejo @relation(fields: [id_consejo], references: [id], name: "AsistenciaConsejoConsejo")
+  Miembro Miembro @relation(fields: [id_miembro], references: [id], name: "AsistenciaMiembro")
+}
+
+enum ESTADO_TEMARIO {
+  PENDIENTE
+  EN_TRATAMIENTO
+  TRATADO
+  POSPUESTO
+}
+
+model TemarioConsejo {
+  id          Int            @id @default(autoincrement())
+  titulo      String
+  descripcion String?
+  debate      String?
+  acuerdo     String?
+  sin_mp      Boolean        @default(false)
+  estado      ESTADO_TEMARIO @default(PENDIENTE)
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_consejo Int
+
+  // Foreign key relations
+  Consejo Consejo @relation(fields: [id_consejo], references: [id], name: "TemarioConsejoConsejo")
+}
+
+//
+// Tablas para rastreo y mantenimiento
+// @Logs
+//
+model Log {
+  id        Int      @id @default(autoincrement())
+  cuenta    Json
+  miembro   Json
+  endpoint  String
+  createdAt DateTime @default(now())
+
+  // Relations
+  Action Action[] @relation(name: "ActionLog")
+}
+
+model Action {
+  id             Int      @id @default(autoincrement())
+  tabla          String
+  pre_registro   Json
+  post_resgistro Json?
+  createdAt      DateTime @default(now())
+
+  // Foreign key
+  id_log Int
+
+  // Foreign key relations
+  Log Log @relation(fields: [id_log], references: [id], name: "ActionLog")
+}
+
+//
+// Tablas para permisos y roles
+// @Role
+// @Permission
+// @RolePermission
+// @CuentaRole
+//
+model Role {
+  id          Int     @id @default(autoincrement())
+  nombre      String  @unique // ADM - DEV - OWN
+  descripcion String?
+
+  // Relations
+  RolePermission RolePermission[]
+  CuentaRole     CuentaRole[]
+}
+
+enum ACTION {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  MANAGE
+}
+
+enum RESOURCE {
+  CUENTA
+  MIEMBRO
+  PROTAGONISTA
+  ADULTO
+  RESPONSABLE
+  AREA
+  RAMA
+  EVENTO
+  INSCRIPCION
+  PAGO
+  PRESUPUESTO
+  INVENTARIO
+  PLAN_FORMACION
+  ASISTENCIA
+  CERTIFICADO
+  CUENTA_DINERO
+  TIPO_EVENTO
+  LIBRO_ACTAS
+  LOG
+  ACTION
+  ROLE
+  RELACION
+  CONCEPTO_PAGO
+  METODO_PAGO
+  COMISION
+  PARTICIPANTE_COMISION
+  CONSEJO
+  ASISTENCIA_CONSEJO
+}
+
+model Permission {
+  id       Int      @id @default(autoincrement())
+  action   ACTION
+  resource RESOURCE
+
+  // Relations
+  Roles RolePermission[]
+
+  @@unique([action, resource])
+}
+
+enum SCOPE {
+  GRUPO
+  RAMA
+  AREA
+  GLOBAL
+  OWN
+}
+
+model RolePermission {
+  id_role       Int
+  id_permission Int
+
+  // Foreign key relations
+  Role       Role       @relation(fields: [id_role], references: [id])
+  Permission Permission @relation(fields: [id_permission], references: [id])
+
+  @@id([id_role, id_permission])
+}
+
+model CuentaRole {
+  id         Int      @id @default(autoincrement())
+  createdAt  DateTime @default(now())
+  tipo_scope SCOPE    @default(GLOBAL)
+  id_scope   Int?
+
+  // Foreign keys
+  id_cuenta Int
+  id_role   Int
+
+  // Foreign key relations
+  Cuenta Cuenta @relation(fields: [id_cuenta], references: [id], name: "CuentaRole")
+  Role   Role   @relation(fields: [id_role], references: [id])
+}
