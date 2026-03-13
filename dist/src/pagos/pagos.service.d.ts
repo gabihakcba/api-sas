@@ -12,13 +12,25 @@ export declare class PagosService {
     findAll(user: AuthenticatedUser, paginationQuery: PaginationQueryDto): Promise<{
         data: {
             id: number;
+            CuentaDinero: {
+                id: number;
+                nombre: string;
+            };
             Miembro: {
                 id: number;
                 nombre: string;
-                apellidos: string;
                 dni: string;
+                apellidos: string;
             };
-            CuentaDinero: {
+            Evento: {
+                id: number;
+                nombre: string;
+            } | null;
+            ConceptoPago: {
+                id: number;
+                nombre: string;
+            };
+            MetodoPago: {
                 id: number;
                 nombre: string;
             };
@@ -26,18 +38,6 @@ export declare class PagosService {
             detalles: string | null;
             fecha_pago: Date;
             codigo_validacion: string;
-            MetodoPago: {
-                id: number;
-                nombre: string;
-            };
-            ConceptoPago: {
-                id: number;
-                nombre: string;
-            };
-            Evento: {
-                id: number;
-                nombre: string;
-            } | null;
             CuentaOrigen: {
                 id: number;
                 nombre: string;
@@ -52,22 +52,22 @@ export declare class PagosService {
     }>;
     getOptions(user: AuthenticatedUser): Promise<{
         cuentas: {
+            Rama: {
+                id: number;
+                nombre: string;
+            } | null;
             id: number;
             nombre: string;
-            id_miembro: number | null;
+            Area: {
+                id: number;
+                nombre: string;
+            } | null;
             Miembro: {
                 id: number;
                 nombre: string;
                 apellidos: string;
             } | null;
-            Rama: {
-                id: number;
-                nombre: string;
-            } | null;
-            Area: {
-                id: number;
-                nombre: string;
-            } | null;
+            id_miembro: number | null;
             monto_actual: Prisma.Decimal;
         }[];
         conceptos: {
@@ -81,19 +81,31 @@ export declare class PagosService {
         miembros: {
             id: number;
             nombre: string;
-            apellidos: string;
             dni: string;
+            apellidos: string;
         }[];
     }>;
     findOne(id: number, user: AuthenticatedUser): Promise<{
         id: number;
+        CuentaDinero: {
+            id: number;
+            nombre: string;
+        };
         Miembro: {
             id: number;
             nombre: string;
-            apellidos: string;
             dni: string;
+            apellidos: string;
         };
-        CuentaDinero: {
+        Evento: {
+            id: number;
+            nombre: string;
+        } | null;
+        ConceptoPago: {
+            id: number;
+            nombre: string;
+        };
+        MetodoPago: {
             id: number;
             nombre: string;
         };
@@ -101,18 +113,6 @@ export declare class PagosService {
         detalles: string | null;
         fecha_pago: Date;
         codigo_validacion: string;
-        MetodoPago: {
-            id: number;
-            nombre: string;
-        };
-        ConceptoPago: {
-            id: number;
-            nombre: string;
-        };
-        Evento: {
-            id: number;
-            nombre: string;
-        } | null;
         CuentaOrigen: {
             id: number;
             nombre: string;
@@ -120,13 +120,25 @@ export declare class PagosService {
     }>;
     create(dto: CreatePagoDto, user: AuthenticatedUser): Promise<{
         id: number;
+        CuentaDinero: {
+            id: number;
+            nombre: string;
+        };
         Miembro: {
             id: number;
             nombre: string;
-            apellidos: string;
             dni: string;
+            apellidos: string;
         };
-        CuentaDinero: {
+        Evento: {
+            id: number;
+            nombre: string;
+        } | null;
+        ConceptoPago: {
+            id: number;
+            nombre: string;
+        };
+        MetodoPago: {
             id: number;
             nombre: string;
         };
@@ -134,18 +146,6 @@ export declare class PagosService {
         detalles: string | null;
         fecha_pago: Date;
         codigo_validacion: string;
-        MetodoPago: {
-            id: number;
-            nombre: string;
-        };
-        ConceptoPago: {
-            id: number;
-            nombre: string;
-        };
-        Evento: {
-            id: number;
-            nombre: string;
-        } | null;
         CuentaOrigen: {
             id: number;
             nombre: string;
@@ -153,13 +153,25 @@ export declare class PagosService {
     } | null>;
     update(id: number, dto: UpdatePagoDto, user: AuthenticatedUser): Promise<{
         id: number;
+        CuentaDinero: {
+            id: number;
+            nombre: string;
+        };
         Miembro: {
             id: number;
             nombre: string;
-            apellidos: string;
             dni: string;
+            apellidos: string;
         };
-        CuentaDinero: {
+        Evento: {
+            id: number;
+            nombre: string;
+        } | null;
+        ConceptoPago: {
+            id: number;
+            nombre: string;
+        };
+        MetodoPago: {
             id: number;
             nombre: string;
         };
@@ -167,18 +179,6 @@ export declare class PagosService {
         detalles: string | null;
         fecha_pago: Date;
         codigo_validacion: string;
-        MetodoPago: {
-            id: number;
-            nombre: string;
-        };
-        ConceptoPago: {
-            id: number;
-            nombre: string;
-        };
-        Evento: {
-            id: number;
-            nombre: string;
-        } | null;
         CuentaOrigen: {
             id: number;
             nombre: string;

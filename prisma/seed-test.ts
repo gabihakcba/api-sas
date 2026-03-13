@@ -441,9 +441,7 @@ async function seedProtagonistasPorRama(
   const protagonistaRole = lookups.roles.get('PROTAGONISTA');
 
   if (!protagonistaRole) {
-    throw new Error(
-      'Falta el rol PROTAGONISTA. Ejecuta primero el seed base.',
-    );
+    throw new Error('Falta el rol PROTAGONISTA. Ejecuta primero el seed base.');
   }
 
   for (const rama of lookups.ramas.values()) {
@@ -461,14 +459,14 @@ async function seedProtagonistasPorRama(
         tx,
         passwordHash,
         {
-        user: `test.protagonista.${ramaSlug}.${sequence}`,
-        dni: `${dniSequence}`,
-        nombre: `Protagonista${sequence}`,
-        apellidos: rama.nombre,
-        fechaNacimiento: buildBirthDate(age, sequence, 10 + sequence),
-        direccion: `Calle ${rama.nombre} ${sequence}`,
-        email: `test.protagonista.${ramaSlug}.${sequence}@sas.local`,
-        telefonoEmergencia: `54011000${dniSequence}`,
+          user: `test.protagonista.${ramaSlug}.${sequence}`,
+          dni: `${dniSequence}`,
+          nombre: `Protagonista${sequence}`,
+          apellidos: rama.nombre,
+          fechaNacimiento: buildBirthDate(age, sequence, 10 + sequence),
+          direccion: `Calle ${rama.nombre} ${sequence}`,
+          email: `test.protagonista.${ramaSlug}.${sequence}@sas.local`,
+          telefonoEmergencia: `54011000${dniSequence}`,
         },
       );
 

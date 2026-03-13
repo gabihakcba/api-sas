@@ -15,6 +15,10 @@ export declare class ConsejosService {
             id: number;
             nombre: string;
             descripcion: string | null;
+            _count: {
+                AsistenciaConsejo: number;
+                TemarioConsejo: number;
+            };
             fecha: Date;
             es_ordinario: boolean;
             hora_inicio: Date | null;
@@ -22,16 +26,12 @@ export declare class ConsejosService {
             TemarioConsejo: {
                 id: number;
                 descripcion: string | null;
-                sin_mp: boolean;
                 titulo: string;
                 debate: string | null;
                 acuerdo: string | null;
                 estado: import(".prisma/client").$Enums.ESTADO_TEMARIO;
+                sin_mp: boolean;
             }[];
-            _count: {
-                AsistenciaConsejo: number;
-                TemarioConsejo: number;
-            };
         }[];
         meta: {
             page: number;
@@ -44,6 +44,10 @@ export declare class ConsejosService {
         id: number;
         nombre: string;
         descripcion: string | null;
+        _count: {
+            AsistenciaConsejo: number;
+            TemarioConsejo: number;
+        };
         fecha: Date;
         es_ordinario: boolean;
         hora_inicio: Date | null;
@@ -51,21 +55,21 @@ export declare class ConsejosService {
         TemarioConsejo: {
             id: number;
             descripcion: string | null;
-            sin_mp: boolean;
             titulo: string;
             debate: string | null;
             acuerdo: string | null;
             estado: import(".prisma/client").$Enums.ESTADO_TEMARIO;
+            sin_mp: boolean;
         }[];
-        _count: {
-            AsistenciaConsejo: number;
-            TemarioConsejo: number;
-        };
     }>;
     create(dto: CreateConsejoDto): Promise<{
         id: number;
         nombre: string;
         descripcion: string | null;
+        _count: {
+            AsistenciaConsejo: number;
+            TemarioConsejo: number;
+        };
         fecha: Date;
         es_ordinario: boolean;
         hora_inicio: Date | null;
@@ -73,16 +77,12 @@ export declare class ConsejosService {
         TemarioConsejo: {
             id: number;
             descripcion: string | null;
-            sin_mp: boolean;
             titulo: string;
             debate: string | null;
             acuerdo: string | null;
             estado: import(".prisma/client").$Enums.ESTADO_TEMARIO;
+            sin_mp: boolean;
         }[];
-        _count: {
-            AsistenciaConsejo: number;
-            TemarioConsejo: number;
-        };
     }>;
     exportPdf(idConsejo: number, user: AuthenticatedUser, includePrivateTopics: boolean): Promise<{
         filename: string;
@@ -94,8 +94,8 @@ export declare class ConsejosService {
         Miembro: {
             id: number;
             nombre: string;
-            apellidos: string;
             dni: string;
+            apellidos: string;
             Protagonista: {
                 id: number;
                 Miembro: {
@@ -121,8 +121,8 @@ export declare class ConsejosService {
         sortOrder: number;
         id: number;
         nombre: string;
-        apellidos: string;
         dni: string;
+        apellidos: string;
         Protagonista: {
             id: number;
             Miembro: {
@@ -144,20 +144,20 @@ export declare class ConsejosService {
     findTemario(id: number, user: AuthenticatedUser): Promise<{
         id: number;
         descripcion: string | null;
-        sin_mp: boolean;
         titulo: string;
         debate: string | null;
         acuerdo: string | null;
         estado: import(".prisma/client").$Enums.ESTADO_TEMARIO;
+        sin_mp: boolean;
     }[]>;
     createTemario(idConsejo: number, dto: CreateTemarioConsejoDto): Promise<{
         id: number;
         descripcion: string | null;
-        sin_mp: boolean;
         titulo: string;
         debate: string | null;
         acuerdo: string | null;
         estado: import(".prisma/client").$Enums.ESTADO_TEMARIO;
+        sin_mp: boolean;
     }>;
     createAsistencia(idConsejo: number, dto: CreateAsistenciaConsejoDto): Promise<{
         id: number;
@@ -165,8 +165,8 @@ export declare class ConsejosService {
         Miembro: {
             id: number;
             nombre: string;
-            apellidos: string;
             dni: string;
+            apellidos: string;
             Protagonista: {
                 id: number;
                 Miembro: {
@@ -190,6 +190,10 @@ export declare class ConsejosService {
         id: number;
         nombre: string;
         descripcion: string | null;
+        _count: {
+            AsistenciaConsejo: number;
+            TemarioConsejo: number;
+        };
         fecha: Date;
         es_ordinario: boolean;
         hora_inicio: Date | null;
@@ -197,26 +201,22 @@ export declare class ConsejosService {
         TemarioConsejo: {
             id: number;
             descripcion: string | null;
-            sin_mp: boolean;
             titulo: string;
             debate: string | null;
             acuerdo: string | null;
             estado: import(".prisma/client").$Enums.ESTADO_TEMARIO;
+            sin_mp: boolean;
         }[];
-        _count: {
-            AsistenciaConsejo: number;
-            TemarioConsejo: number;
-        };
     }>;
     remove(id: number): Promise<void>;
     updateTemario(idConsejo: number, temarioId: number, dto: UpdateTemarioConsejoDto): Promise<{
         id: number;
         descripcion: string | null;
-        sin_mp: boolean;
         titulo: string;
         debate: string | null;
         acuerdo: string | null;
         estado: import(".prisma/client").$Enums.ESTADO_TEMARIO;
+        sin_mp: boolean;
     }>;
     removeTemario(idConsejo: number, temarioId: number): Promise<void>;
     private buildConsejoSelect;
