@@ -234,6 +234,16 @@ const ADULT_CONSEJO_PERMISSIONS: RoleDefinition['permissions'][number] = {
   resources: [RESOURCE.CONSEJO],
 };
 
+const ADULT_RESPONSABLE_PERMISSIONS: RoleDefinition['permissions'][number] = {
+  actions: CRUD_ACTIONS,
+  resources: [RESOURCE.RESPONSABLE],
+};
+
+const ADULT_RELACION_PERMISSIONS: RoleDefinition['permissions'][number] = {
+  actions: CRUD_ACTIONS,
+  resources: [RESOURCE.RELACION],
+};
+
 const ROLE_DEFINITIONS: RoleDefinition[] = [
   {
     nombre: 'ADM',
@@ -296,6 +306,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
       'Acceso total a la informacion y edicion correspondiente a su rama.',
     permissions: [
       ...RAMA_ROLE_PERMISSIONS,
+      ADULT_RESPONSABLE_PERMISSIONS,
       ADULT_CONCEPTO_PAGO_PERMISSIONS,
       ADULT_METODO_PAGO_PERMISSIONS,
       ADULT_CUENTA_DINERO_PERMISSIONS,
@@ -308,6 +319,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
       'Mismos permisos exactos que Jefatura de Rama para mantener la gestion horizontal.',
     permissions: [
       ...RAMA_ROLE_PERMISSIONS,
+      ADULT_RESPONSABLE_PERMISSIONS,
       ADULT_CONCEPTO_PAGO_PERMISSIONS,
       ADULT_METODO_PAGO_PERMISSIONS,
       ADULT_CUENTA_DINERO_PERMISSIONS,
@@ -323,6 +335,8 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
         actions: [ACTION.READ],
         resources: INTENDENCIA_READONLY_RESOURCES,
       },
+      ADULT_RESPONSABLE_PERMISSIONS,
+      ADULT_RELACION_PERMISSIONS,
       ADULT_CONCEPTO_PAGO_PERMISSIONS,
       ADULT_METODO_PAGO_PERMISSIONS,
       ADULT_CUENTA_DINERO_PERMISSIONS,

@@ -29,7 +29,7 @@ export class ResponsablesController {
 
   @Get()
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @CheckPermissions('READ:MIEMBRO', 'READ:RESPONSABLE')
+  @CheckPermissions('READ:RESPONSABLE')
   async findAll(
     @Request() req: AuthenticatedRequest,
     @Query() query: ResponsablesQueryDto,
@@ -39,14 +39,14 @@ export class ResponsablesController {
 
   @Get('options')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @CheckPermissions('READ:MIEMBRO', 'READ:RESPONSABLE')
+  @CheckPermissions('READ:RESPONSABLE')
   async getOptions(@Request() req: AuthenticatedRequest) {
     return this.responsablesService.getOptions(req.user!);
   }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @CheckPermissions('READ:MIEMBRO', 'READ:RESPONSABLE')
+  @CheckPermissions('READ:RESPONSABLE')
   async findOne(
     @Request() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
@@ -57,7 +57,7 @@ export class ResponsablesController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @CheckPermissions('CREATE:MIEMBRO', 'CREATE:RESPONSABLE')
+  @CheckPermissions('CREATE:RESPONSABLE')
   async create(
     @Body() dto: CreateResponsableDto,
     @Request() req: AuthenticatedRequest,
@@ -67,7 +67,7 @@ export class ResponsablesController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @CheckPermissions('UPDATE:MIEMBRO', 'UPDATE:RESPONSABLE')
+  @CheckPermissions('UPDATE:RESPONSABLE')
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateResponsableDto,
@@ -78,7 +78,7 @@ export class ResponsablesController {
 
   @Patch(':id/responsabilidades')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @CheckPermissions('UPDATE:RESPONSABLE', 'UPDATE:PROTAGONISTA')
+  @CheckPermissions('UPDATE:RESPONSABLE')
   async updateResponsabilidades(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateResponsabilidadesDto,
@@ -90,7 +90,7 @@ export class ResponsablesController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @CheckPermissions('DELETE:MIEMBRO', 'DELETE:RESPONSABLE')
+  @CheckPermissions('DELETE:RESPONSABLE')
   async remove(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest,
