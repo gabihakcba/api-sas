@@ -5,7 +5,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { existsSync } from 'node:fs';
+import * as path from 'node:path';
 import { Prisma, SCOPE } from '@prisma/client';
+import PDFDocument = require('pdfkit');
 import {
   AuthenticatedScope,
   AuthenticatedUser,
@@ -244,6 +247,26 @@ export class PagosService {
     return pago;
   }
 
+  async exportReceiptPdf(id: number, user: AuthenticatedUser) {
+    const pago = await this.findOne(id, user);
+    const firmaResponsable = pago.Responsable
+      ? await this.getResponsableFirma(pago.Responsable.id)
+      : null;
+    const responsableStamp = pago.Responsable
+      ? await this.getResponsableStamp(pago.Responsable.id)
+      : null;
+    const buffer = await this.buildReceiptPdfBuffer(
+      pago,
+      firmaResponsable,
+      responsableStamp,
+    );
+
+    return {
+      filename: `comprobante-pago-${String(pago.id).padStart(6, '0')}.pdf`,
+      buffer,
+    };
+  }
+
   async create(dto: CreatePagoDto, user: AuthenticatedUser) {
     return this.prisma.$transaction(async (tx) => {
       const data = await this.resolvePagoData(tx, dto, user);
@@ -269,6 +292,7 @@ export class PagosService {
           id_metodo_pago: data.idMetodoPago,
           id_concepto_pago: data.idConceptoPago,
           id_miembro: data.idMiembro,
+          id_responsable: data.idResponsable,
           id_evento: data.idEvento,
         },
         select: {
@@ -337,6 +361,7 @@ export class PagosService {
           id_metodo_pago: resolved.idMetodoPago,
           id_concepto_pago: resolved.idConceptoPago,
           id_miembro: resolved.idMiembro,
+          id_responsable: resolved.idResponsable,
           id_evento: resolved.idEvento,
         },
       });
@@ -376,6 +401,14 @@ export class PagosService {
       fecha_pago: true,
       codigo_validacion: true,
       Miembro: {
+        select: {
+          id: true,
+          nombre: true,
+          apellidos: true,
+          dni: true,
+        },
+      },
+      Responsable: {
         select: {
           id: true,
           nombre: true,
@@ -467,6 +500,7 @@ export class PagosService {
     }
 
     await this.ensureVisibleMiembro(tx, dto.idMiembro, user);
+    const responsableId = await this.resolveAuthenticatedResponsable(tx, user);
 
     const metodo = await tx.metodoPago.findFirst({
       where: {
@@ -521,6 +555,7 @@ export class PagosService {
       idMetodoPago: dto.idMetodoPago,
       idConceptoPago: dto.idConceptoPago,
       idMiembro: dto.idMiembro,
+      idResponsable: responsableId,
       idEvento: dto.idEvento ?? null,
     };
   }
@@ -576,6 +611,42 @@ export class PagosService {
         'No tienes acceso al miembro indicado para registrar este pago.',
       );
     }
+  }
+
+  private async resolveAuthenticatedResponsable(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+  ) {
+    const responsable = await tx.miembro.findFirst({
+      where: {
+        id_cuenta: user.userId,
+        borrado: false,
+        Adulto: {
+          is: {
+            borrado: false,
+            activo: true,
+          },
+        },
+      },
+      select: {
+        id: true,
+        firma: true,
+      },
+    });
+
+    if (!responsable) {
+      throw new ForbiddenException(
+        'Solo un adulto autenticado puede registrar pagos.',
+      );
+    }
+
+    if (!responsable.firma || responsable.firma.length === 0) {
+      throw new BadRequestException(
+        'No se puede registrar el pago porque el adulto responsable no tiene firma cargada.',
+      );
+    }
+
+    return responsable.id;
   }
 
   private async applyPagoImpact(
@@ -935,5 +1006,322 @@ export class PagosService {
         scope.scopeType === SCOPE.GRUPO ||
         scope.scopeType === SCOPE.OWN,
     );
+  }
+
+  private async buildReceiptPdfBuffer(
+    pago: Awaited<ReturnType<PagosService['findOne']>>,
+    firmaResponsable: Buffer | null,
+    responsableStamp: {
+      nombreCompleto: string;
+      dni: string;
+      rama: string | null;
+      area: string | null;
+      posicion: string | null;
+    } | null,
+  ): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      const doc = new PDFDocument({
+        size: [595.28, 420.94],
+        margin: 24,
+      });
+
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const left = doc.page.margins.left;
+      const top = doc.page.margins.top;
+      const width =
+        doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const height =
+        doc.page.height - doc.page.margins.top - doc.page.margins.bottom;
+      const logoPath = this.resolveScoutLogoPath();
+
+      doc
+        .lineWidth(1)
+        .strokeColor('#111827')
+        .rect(left, top, width, height)
+        .stroke();
+
+      if (logoPath) {
+        doc.image(logoPath, left + 18, top + 18, { fit: [44, 44] });
+      }
+
+      doc
+        .fillColor('#111827')
+        .font('Helvetica-Bold')
+        .fontSize(16)
+        .text('Grupo Scout Adalberto Lopez', left + 72, top + 24);
+
+      doc
+        .font('Helvetica')
+        .fontSize(10)
+        .fillColor('#6b7280')
+        .text('Siempre Listos', left + 72, top + 44);
+
+      doc
+        .fillColor('#111827')
+        .font('Helvetica-Bold')
+        .fontSize(13)
+        .text('COMPROBANTE DE PAGO', left + width - 220, top + 18, {
+          width: 200,
+          align: 'right',
+        });
+
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(11.5)
+        .text(
+          `N° ${String(pago.id).padStart(6, '0')}`,
+          left + width - 200,
+          top + 42,
+          {
+            width: 180,
+            align: 'right',
+          },
+        );
+
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(10)
+        .text(
+          `Fecha: ${this.formatDate(new Date(pago.fecha_pago))}`,
+          left + width - 200,
+          top + 62,
+          {
+            width: 180,
+            align: 'right',
+          },
+        );
+
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .fillColor('#9ca3af')
+        .text(
+          `Hash: ${pago.codigo_validacion.slice(0, 8).toUpperCase()}-${pago.codigo_validacion.slice(-4).toUpperCase()}`,
+          left + width - 200,
+          top + 82,
+          {
+            width: 180,
+            align: 'right',
+          },
+        );
+
+      doc
+        .moveTo(left + 18, top + 112)
+        .lineTo(left + width - 18, top + 112)
+        .strokeColor('#d1d5db')
+        .lineWidth(1)
+        .stroke();
+
+      const labelX = left + 18;
+      const valueX = left + 150;
+      let cursorY = top + 138;
+
+      const rows = [
+        {
+          label: 'Recibi de:',
+          value: `${pago.Miembro.nombre} ${pago.Miembro.apellidos} (DNI: ${pago.Miembro.dni})`,
+        },
+        {
+          label: 'La suma de:',
+          value: this.formatCurrency(pago.monto),
+        },
+        {
+          label: 'En concepto de:',
+          value: pago.ConceptoPago.nombre,
+        },
+        {
+          label: 'Medio de Pago:',
+          value: pago.MetodoPago.nombre,
+        },
+      ];
+
+      rows.forEach((row) => {
+        doc
+          .fillColor('#111827')
+          .font('Helvetica-Bold')
+          .fontSize(10)
+          .text(row.label, labelX, cursorY);
+
+        doc
+          .font('Helvetica')
+          .fontSize(10)
+          .text(row.value, valueX, cursorY, {
+            width: width - (valueX - left) - 18,
+          });
+
+        cursorY += 26;
+      });
+
+      doc
+        .fillColor('#6b7280')
+        .font('Helvetica')
+        .fontSize(8.5)
+        .text(
+          'Comprobante válido como constancia de pago interna.',
+          labelX,
+          top + 304,
+        );
+
+      doc.text(`Generado el ${this.formatDate(new Date())}`, labelX, top + 322);
+
+      const signatureY = top + 318;
+      const signatureX = left + width - 190;
+      doc
+        .moveTo(signatureX, signatureY)
+        .lineTo(signatureX + 140, signatureY)
+        .strokeColor('#111827')
+        .lineWidth(1)
+        .stroke();
+
+      if (firmaResponsable) {
+        doc.image(firmaResponsable, signatureX + 8, signatureY - 48, {
+          fit: [124, 40],
+          align: 'center',
+          valign: 'center',
+        });
+      }
+
+      if (responsableStamp) {
+        const stampTop = signatureY + 6;
+
+        doc
+          .roundedRect(signatureX - 4, stampTop, 148, 42, 8)
+          .fillOpacity(0.08)
+          .fillAndStroke('#e5e7eb', '#9ca3af');
+
+        doc.fillOpacity(1);
+
+        doc
+          .fillColor('#4b5563')
+          .font('Helvetica')
+          .fontSize(8)
+          .text(
+            `${responsableStamp.nombreCompleto} • DNI ${responsableStamp.dni}`,
+            signatureX - 8,
+            stampTop + 10,
+            {
+              width: 156,
+              align: 'center',
+            },
+          );
+
+        doc.text(
+          `${responsableStamp.rama ?? responsableStamp.area ?? 'Sin asignacion'}${responsableStamp.posicion ? ` • ${responsableStamp.posicion}` : ''}`,
+          signatureX - 8,
+          stampTop + 24,
+          {
+            width: 156,
+            align: 'center',
+          },
+        );
+      }
+
+      doc.end();
+    });
+  }
+
+  private resolveScoutLogoPath() {
+    const candidates = [
+      path.resolve(process.cwd(), 'public/scout_logo.png'),
+      path.resolve(process.cwd(), '../front-sas/public/scout_logo.png'),
+      path.resolve(process.cwd(), '../public/scout_logo.png'),
+    ];
+
+    return candidates.find((candidate) => existsSync(candidate));
+  }
+
+  private async getResponsableFirma(idMiembro: number) {
+    const miembro = await this.prisma.miembro.findFirst({
+      where: {
+        id: idMiembro,
+        borrado: false,
+      },
+      select: {
+        firma: true,
+      },
+    });
+
+    return miembro?.firma ? Buffer.from(miembro.firma) : null;
+  }
+
+  private async getResponsableStamp(idMiembro: number) {
+    const miembro = await this.prisma.miembro.findFirst({
+      where: {
+        id: idMiembro,
+        borrado: false,
+      },
+      select: {
+        nombre: true,
+        apellidos: true,
+        dni: true,
+        Adulto: {
+          select: {
+            EquipoArea: {
+              where: {
+                borrado: false,
+                activo: true,
+                fecha_fin: null,
+              },
+              orderBy: {
+                fecha_inicio: 'desc',
+              },
+              take: 1,
+              select: {
+                Rama: {
+                  select: {
+                    nombre: true,
+                  },
+                },
+                Area: {
+                  select: {
+                    nombre: true,
+                  },
+                },
+                Posicion: {
+                  select: {
+                    nombre: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!miembro) {
+      return null;
+    }
+
+    const asignacionActual = miembro.Adulto?.EquipoArea[0] ?? null;
+
+    return {
+      nombreCompleto: `${miembro.apellidos}, ${miembro.nombre}`,
+      dni: miembro.dni,
+      rama: asignacionActual?.Rama?.nombre ?? null,
+      area: asignacionActual?.Area.nombre ?? null,
+      posicion: asignacionActual?.Posicion.nombre ?? null,
+    };
+  }
+
+  private formatDate(value: Date) {
+    return new Intl.DateTimeFormat('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(value);
+  }
+
+  private formatCurrency(value: string | number | Prisma.Decimal) {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(Number(value));
   }
 }

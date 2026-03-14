@@ -49,6 +49,7 @@ model Miembro {
   telefono_emergencia String
   totem               String?
   cualidad            String?
+  firma               Bytes?
 
   borrado   Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -68,6 +69,7 @@ model Miembro {
   ParticipantesComision ParticipantesComision[] @relation(name: "ParticipantesComisionMiembro")
   InscripcionEvento     InscripcionEvento[]     @relation(name: "InscripcionEventoMiembro")
   Pago                  Pago[]                  @relation(name: "PagoMiembro")
+  PagoResponsable       Pago[]                  @relation(name: "PagoResponsable")
   AsistenciaConsejo     AsistenciaConsejo[]     @relation(name: "AsistenciaMiembro")
   CuentaDinero          CuentaDinero[]          @relation(name: "CuentaMiembro")
 }
@@ -422,6 +424,7 @@ model Pago {
   id_evento        Int?
   id_miembro       Int
   id_cuenta_origen Int?
+  id_responsable   Int?
 
   // Foreign key relations
   CuentaDinero CuentaDinero  @relation(fields: [id_cuenta_dinero], references: [id], name: "PagoCuentaDinero")
@@ -429,6 +432,7 @@ model Pago {
   ConceptoPago ConceptoPago  @relation(fields: [id_concepto_pago], references: [id], name: "PagoConceptoPago")
   Evento       Evento?       @relation(fields: [id_evento], references: [id], name: "PagoEvento")
   Miembro      Miembro       @relation(fields: [id_miembro], references: [id], name: "PagoMiembro")
+  Responsable  Miembro?      @relation(fields: [id_responsable], references: [id], name: "PagoResponsable")
   CuentaOrigen CuentaDinero? @relation(fields: [id_cuenta_origen], references: [id], name: "PagoCuentaOrigen")
 }
 

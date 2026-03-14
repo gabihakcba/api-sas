@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsDate,
@@ -54,6 +54,7 @@ export class UpdateProtagonistaDto {
   direccion?: string;
 
   @IsOptional()
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsEmail()
   @MaxLength(255)
   email?: string;

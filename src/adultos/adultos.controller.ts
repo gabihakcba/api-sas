@@ -23,6 +23,7 @@ import { AuthenticatedRequest } from '../auth/types/auth-request.types';
 import { AdultosService } from './adultos.service';
 import { AdultosQueryDto } from './dto/adultos-query.dto';
 import { CreateAdultoDto } from './dto/create-adulto.dto';
+import { UpdateAdultoFirmaDto } from './dto/update-adulto-firma.dto';
 import { UpdateAdultoDto } from './dto/update-adulto.dto';
 
 @Controller('adultos')
@@ -56,6 +57,16 @@ export class AdultosController {
     return this.adultosService.findOne(id, req.user!);
   }
 
+  @Get(':id/firma')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('READ:MIEMBRO', 'READ:ADULTO')
+  async getFirma(
+    @Request() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.adultosService.getFirma(id, req.user!);
+  }
+
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard, PermissionsGuard, ScopesGuard)
@@ -81,6 +92,16 @@ export class AdultosController {
     @Request() req: AuthenticatedRequest,
   ) {
     return this.adultosService.update(id, dto, req.user!);
+  }
+
+  @Patch(':id/firma')
+  @UseGuards(JwtAuthGuard)
+  async updateFirma(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateAdultoFirmaDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.adultosService.updateFirma(id, dto, req.user!);
   }
 
   @Delete(':id')

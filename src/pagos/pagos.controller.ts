@@ -10,9 +10,11 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   Request,
   UseGuards,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { CheckPermissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
@@ -51,6 +53,25 @@ export class PagosController {
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.pagosService.findOne(id, req.user!);
+  }
+
+  @Get(':id/comprobante')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('READ:PAGO')
+  async exportReceiptPdf(
+    @Request() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    const receipt = await this.pagosService.exportReceiptPdf(id, req.user!);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${receipt.filename}"`,
+    );
+
+    res.send(receipt.buffer);
   }
 
   @Post()

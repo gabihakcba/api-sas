@@ -10,6 +10,7 @@ import { CuentasService } from '../cuentas/cuentas.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdultosQueryDto } from './dto/adultos-query.dto';
 import { CreateAdultoDto } from './dto/create-adulto.dto';
+import { UpdateAdultoFirmaDto } from './dto/update-adulto-firma.dto';
 import { UpdateAdultoDto } from './dto/update-adulto.dto';
 
 @Injectable()
@@ -371,6 +372,89 @@ export class AdultosService {
     }
 
     return adulto;
+  }
+
+  async getFirma(id: number, user: AuthenticatedUser) {
+    const adulto = await this.prisma.adulto.findFirst({
+      where: this.scopeFilterService.mergeWhere(
+        {
+          id,
+          borrado: false,
+          Miembro: {
+            borrado: false,
+          },
+        },
+        this.scopeFilterService.forAdultos(user),
+      ),
+      select: {
+        id: true,
+        Miembro: {
+          select: {
+            id: true,
+            firma: true,
+          },
+        },
+      },
+    });
+
+    if (!adulto) {
+      throw new NotFoundException('El adulto indicado no existe.');
+    }
+
+    return {
+      firmaBase64: adulto.Miembro.firma
+        ? `data:image/png;base64,${Buffer.from(adulto.Miembro.firma).toString('base64')}`
+        : null,
+    };
+  }
+
+  async updateFirma(
+    id: number,
+    dto: UpdateAdultoFirmaDto,
+    user: AuthenticatedUser,
+  ) {
+    const adulto = await this.prisma.adulto.findFirst({
+      where: {
+        id,
+        borrado: false,
+        Miembro: {
+          borrado: false,
+          id_cuenta: Number(user.userId),
+        },
+      },
+      select: {
+        id: true,
+        Miembro: {
+          select: {
+            id: true,
+            id_cuenta: true,
+          },
+        },
+      },
+    });
+
+    if (!adulto) {
+      throw new BadRequestException(
+        'Solo puedes modificar tu propia firma.',
+      );
+    }
+
+    const firma = this.parseFirmaBase64(dto.firmaBase64 ?? null);
+
+    await this.prisma.miembro.update({
+      where: {
+        id: adulto.Miembro.id,
+      },
+      data: {
+        firma,
+      },
+    });
+
+    return {
+      firmaBase64: firma
+        ? `data:image/png;base64,${Buffer.from(firma).toString('base64')}`
+        : null,
+    };
   }
 
   async create(dto: CreateAdultoDto) {
@@ -919,6 +1003,29 @@ export class AdultosService {
     await tx.cuentaDinero.create({
       data,
     });
+  }
+
+  private parseFirmaBase64(value: string | null) {
+    if (value == null) {
+      return null;
+    }
+
+    const match = value.match(/^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$/);
+    const normalized = match ? match[1] : value;
+
+    try {
+      const buffer = Buffer.from(normalized, 'base64');
+
+      if (buffer.length === 0) {
+        throw new Error('empty');
+      }
+
+      return buffer;
+    } catch {
+      throw new BadRequestException(
+        'La firma enviada no tiene un formato de imagen base64 válido.',
+      );
+    }
   }
 
   private validateScopeConfiguration(
