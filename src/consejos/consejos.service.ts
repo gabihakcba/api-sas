@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ESTADO_TEMARIO, Prisma } from '@prisma/client';
-import PDFDocument from 'pdfkit';
+import PDFDocument = require('pdfkit');
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -601,8 +601,12 @@ export class ConsejosService {
   private normalizeTemarioCreatePayload(dto: CreateTemarioConsejoDto) {
     const titulo = dto.titulo.trim().replace(/\s+/g, ' ');
     const descripcion = dto.descripcion?.trim() || null;
-    const debate = dto.debate?.trim() || null;
-    const acuerdo = dto.acuerdo?.trim() || null;
+    const debate = dto.debate?.trim()
+      ? this.sanitizeRichTextHtml(dto.debate.trim())
+      : null;
+    const acuerdo = dto.acuerdo?.trim()
+      ? this.sanitizeRichTextHtml(dto.acuerdo.trim())
+      : null;
 
     if (titulo.length < 3) {
       throw new BadRequestException(
@@ -637,9 +641,17 @@ export class ConsejosService {
         ? dto.descripcion.trim() || null
         : undefined;
     const debate =
-      dto.debate !== undefined ? dto.debate.trim() || null : undefined;
+      dto.debate !== undefined
+        ? dto.debate.trim()
+          ? this.sanitizeRichTextHtml(dto.debate.trim())
+          : null
+        : undefined;
     const acuerdo =
-      dto.acuerdo !== undefined ? dto.acuerdo.trim() || null : undefined;
+      dto.acuerdo !== undefined
+        ? dto.acuerdo.trim()
+          ? this.sanitizeRichTextHtml(dto.acuerdo.trim())
+          : null
+        : undefined;
 
     if (titulo !== undefined && titulo.length < 3) {
       throw new BadRequestException(
@@ -793,208 +805,460 @@ export class ConsejosService {
       });
       doc.on('error', reject);
 
-      this.drawHeaderCard(doc, consejo, includePrivateTopics);
-      this.drawSectionTitle(doc, 'Asistencia');
-
-      if (consejo.AsistenciaConsejo.length === 0) {
-        doc
-          .fillColor('#3f4a5a')
-          .fontSize(11)
-          .text('Sin asistencias registradas.');
-      } else {
-        consejo.AsistenciaConsejo.forEach((asistencia) => {
-          doc
-            .fillColor('#1f2937')
-            .fontSize(11)
-            .text(
-              `- ${asistencia.Miembro.apellidos}, ${asistencia.Miembro.nombre} (${asistencia.descripcion})`,
-            );
-        });
-      }
-
-      this.drawSectionTitle(doc, 'Temario');
-
-      if (consejo.TemarioConsejo.length === 0) {
-        doc.fillColor('#3f4a5a').fontSize(11).text('Sin temas registrados.');
-      } else {
-        consejo.TemarioConsejo.forEach((tema, index) => {
-          this.drawTemaCard(doc, tema, index);
-        });
-      }
+      this.drawPdfHeader(doc, consejo, includePrivateTopics);
+      this.drawPdfAttendees(doc, consejo);
+      this.drawPdfTemario(doc, consejo);
 
       doc.end();
     });
   }
 
-  private drawHeaderCard(
+  private drawPdfHeader(
     doc: InstanceType<typeof PDFDocument>,
     consejo: ConsejoExportData,
     includePrivateTopics: boolean,
   ) {
-    const left = doc.page.margins.left;
-    const width =
-      doc.page.width - doc.page.margins.left - doc.page.margins.right;
-    const top = doc.y;
-    const cardHeight = consejo.descripcion ? 128 : 96;
-
-    doc.save();
-    doc.roundedRect(left, top, width, cardHeight, 12).fill('#eef4ff');
-    doc.restore();
-
     doc
       .fillColor('#0f172a')
+      .font('Helvetica-Bold')
       .fontSize(20)
-      .text(consejo.nombre, left + 18, top + 16, {
-        width: width - 36,
-      });
+      .text(consejo.nombre);
 
     doc
       .fillColor('#334155')
+      .font('Helvetica')
       .fontSize(11)
-      .text(`Fecha: ${this.formatDate(consejo.fecha)}`, left + 18, top + 48)
-      .text(
-        `Tipo: ${consejo.es_ordinario ? 'Ordinario' : 'Extraordinario'}`,
-        left + 18,
-        top + 64,
-      )
-      .text(
-        `Horario: ${this.formatTimeRange(consejo.hora_inicio, consejo.hora_fin)}`,
-        left + 220,
-        top + 48,
-      )
-      .text(
-        `Version: ${includePrivateTopics ? 'Completa' : 'Sin temas sin_mp'}`,
-        left + 220,
-        top + 64,
-      );
+      .text(`Fecha: ${this.formatDate(consejo.fecha)}`)
+      .text(`Version: ${includePrivateTopics ? 'Completa' : 'Sin temas sin_mp'}`);
 
     if (consejo.descripcion) {
       doc
         .fillColor('#1e293b')
         .fontSize(10)
-        .text(consejo.descripcion, left + 18, top + 86, {
-          width: width - 36,
-        });
+        .text(consejo.descripcion);
     }
 
-    doc.y = top + cardHeight + 18;
+    doc.moveDown(1);
   }
 
-  private drawSectionTitle(
+  private drawPdfAttendees(
     doc: InstanceType<typeof PDFDocument>,
-    title: string,
+    consejo: ConsejoExportData,
   ) {
+    doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(13).text('Participantes');
+
+    if (consejo.AsistenciaConsejo.length === 0) {
+      doc.moveDown(0.3).fillColor('#475569').font('Helvetica').fontSize(11).text('Sin asistencias registradas.');
+      doc.moveDown(1);
+      return;
+    }
+
+    consejo.AsistenciaConsejo.forEach((asistencia) => {
+      doc
+        .fillColor('#1f2937')
+        .font('Helvetica')
+        .fontSize(11)
+        .text(
+          `- ${asistencia.Miembro.apellidos}, ${asistencia.Miembro.nombre} (${asistencia.descripcion})`,
+        );
+    });
+
+    doc.moveDown(1);
+  }
+
+  private drawPdfTemario(
+    doc: InstanceType<typeof PDFDocument>,
+    consejo: ConsejoExportData,
+  ) {
+    doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(13).text('Temario');
     doc.moveDown(0.5);
-    doc.fillColor('#0f172a').fontSize(14).text(title);
-    doc
-      .moveTo(doc.page.margins.left, doc.y + 4)
-      .lineTo(doc.page.width - doc.page.margins.right, doc.y + 4)
-      .strokeColor('#cbd5e1')
-      .lineWidth(1)
-      .stroke();
-    doc.moveDown(0.8);
-  }
 
-  private drawTemaCard(
-    doc: InstanceType<typeof PDFDocument>,
-    tema: ConsejoExportData['TemarioConsejo'][number],
-    index: number,
-  ) {
-    const left = doc.page.margins.left;
-    const width =
-      doc.page.width - doc.page.margins.left - doc.page.margins.right;
-    const top = doc.y;
-    const descripcionHeight = tema.descripcion ? 28 : 0;
-    const debateText = tema.debate?.trim()
-      ? tema.debate
-      : 'Sin debate cargado.';
-    const acuerdoText = tema.acuerdo?.trim()
-      ? tema.acuerdo
-      : 'Sin acuerdo cargado.';
-    const debateHeight = doc.heightOfString(debateText, {
-      width: width - 40,
-      align: 'left',
-    });
-    const acuerdoHeight = doc.heightOfString(acuerdoText, {
-      width: width - 40,
-      align: 'left',
-    });
-    const cardHeight =
-      108 +
-      descripcionHeight +
-      Math.max(debateHeight, 18) +
-      Math.max(acuerdoHeight, 18);
-
-    if (top + cardHeight > doc.page.height - doc.page.margins.bottom) {
-      doc.addPage();
+    if (consejo.TemarioConsejo.length === 0) {
+      doc.fillColor('#475569').font('Helvetica').fontSize(11).text('Sin temas registrados.');
+      return;
     }
 
-    const effectiveTop = doc.y;
+    consejo.TemarioConsejo.forEach((tema, index) => {
+      const width =
+        doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const debateText = tema.debate?.trim()
+        ? tema.debate
+        : 'Sin debate cargado.';
+      const acuerdoText = tema.acuerdo?.trim()
+        ? tema.acuerdo
+        : 'Sin acuerdo cargado.';
 
-    doc.save();
-    doc.roundedRect(left, effectiveTop, width, cardHeight, 10).fill('#f8fafc');
-    doc.roundedRect(left, effectiveTop, 6, cardHeight, 10).fill('#93c5fd');
-    doc.restore();
+      doc
+        .fillColor('#0f172a')
+        .font('Helvetica-Bold')
+        .fontSize(12)
+        .text(`${index + 1}. ${tema.titulo}`, {
+          width,
+        });
 
-    doc
-      .fillColor('#0f172a')
-      .fontSize(13)
-      .text(`${index + 1}. ${tema.titulo}`, left + 18, effectiveTop + 14, {
-        width: width - 36,
-      });
+      doc
+        .fillColor('#475569')
+        .font('Helvetica')
+        .fontSize(10)
+        .text(`Estado: ${this.formatEstado(tema.estado)}`);
 
-    doc
-      .fillColor('#475569')
-      .fontSize(10)
-      .text(
-        `Estado: ${this.formatEstado(tema.estado)}`,
-        left + 18,
-        effectiveTop + 36,
-      )
-      .text(
-        `Sin MP: ${tema.sin_mp ? 'Si' : 'No'}`,
-        left + 190,
-        effectiveTop + 36,
+      if (tema.descripcion) {
+        doc
+          .moveDown(0.2)
+          .fillColor('#334155')
+          .font('Helvetica')
+          .fontSize(10)
+          .text(tema.descripcion, {
+            width,
+          });
+      }
+
+      doc.moveDown(0.4);
+      doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(11).text('Debate');
+      this.renderRichTextBlock(
+        doc,
+        debateText,
+        doc.page.margins.left,
+        doc.y + 4,
+        width,
       );
 
-    let cursorY = effectiveTop + 54;
+      doc.moveDown(0.6);
+      doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(11).text('Acuerdo');
+      this.renderRichTextBlock(
+        doc,
+        acuerdoText,
+        doc.page.margins.left,
+        doc.y + 4,
+        width,
+      );
 
-    if (tema.descripcion) {
-      doc
-        .fillColor('#1e293b')
-        .fontSize(10)
-        .text(`Descripcion: ${tema.descripcion}`, left + 18, cursorY, {
-          width: width - 36,
+      doc.moveDown(1);
+    });
+  }
+
+  private measureRichTextHeight(
+    doc: InstanceType<typeof PDFDocument>,
+    html: string,
+    width: number,
+  ) {
+    const blocks = this.parseRichTextBlocks(html);
+
+    return blocks.reduce((total, block) => {
+      const text = block.runs.map((run) => run.text).join('') || ' ';
+      const blockStyle = this.getRichTextBlockStyle(block.type);
+      const fontName =
+        blockStyle.bold
+          ? 'Helvetica-Bold'
+          : 'Helvetica';
+      doc.font(fontName).fontSize(blockStyle.fontSize);
+      const blockHeight = doc.heightOfString(text, {
+        width,
+        align: 'left',
+      });
+
+      return total + blockStyle.spacingBefore + Math.max(blockHeight, 18) + blockStyle.spacingAfter;
+    }, 0);
+  }
+
+  private renderRichTextBlock(
+    doc: InstanceType<typeof PDFDocument>,
+    html: string,
+    x: number,
+    y: number,
+    width: number,
+  ) {
+    const blocks = this.parseRichTextBlocks(html);
+    let cursorY = y;
+
+    blocks.forEach((block) => {
+      const blockStyle = this.getRichTextBlockStyle(block.type);
+      const prefix =
+        block.type === 'ordered'
+          ? `${block.index}. `
+          : block.type === 'bullet'
+            ? '• '
+            : '';
+
+      cursorY += blockStyle.spacingBefore;
+
+      let lineX = x;
+
+      if (prefix) {
+        doc
+          .fillColor(blockStyle.color)
+          .font('Helvetica')
+          .fontSize(blockStyle.fontSize)
+          .text(prefix, x, cursorY);
+        lineX = x + doc.widthOfString(prefix);
+      }
+
+      if (block.runs.length === 0) {
+        doc
+          .fillColor(blockStyle.color)
+          .font(blockStyle.bold ? 'Helvetica-Bold' : 'Helvetica')
+          .fontSize(blockStyle.fontSize)
+          .text(' ', lineX, cursorY);
+      } else {
+        block.runs.forEach((run, index) => {
+          const effectiveBold = blockStyle.bold || run.bold;
+          const fontName =
+            effectiveBold && run.italic
+              ? 'Helvetica-BoldOblique'
+              : effectiveBold
+                ? 'Helvetica-Bold'
+                : run.italic
+                  ? 'Helvetica-Oblique'
+                  : 'Helvetica';
+
+          doc
+            .fillColor(run.link ? '#2563eb' : blockStyle.color)
+            .font(fontName)
+            .fontSize(blockStyle.fontSize)
+            .text(run.text || ' ', index === 0 ? lineX : undefined, cursorY, {
+              width: index === 0 ? width - (lineX - x) : undefined,
+              continued: index !== block.runs.length - 1,
+              underline: run.underline || Boolean(run.link),
+              ...(run.link ? { link: run.link } : {}),
+            });
         });
-      cursorY += descripcionHeight;
+      }
+
+      doc.text('', { continued: false });
+      cursorY = doc.y + blockStyle.spacingAfter;
+    });
+
+    return cursorY;
+  }
+
+  private parseRichTextBlocks(html: string): Array<{
+    type: 'paragraph' | 'ordered' | 'bullet' | 'heading1' | 'heading2';
+    index: number;
+    runs: Array<{
+      text: string;
+      bold: boolean;
+      italic: boolean;
+      underline: boolean;
+      link?: string;
+    }>;
+  }> {
+    const normalized = this.normalizeRichHtml(html);
+    const blockPattern = /<(h1|h2|p|li)([^>]*)>([\s\S]*?)<\/\1>/gi;
+    const blocks: Array<{
+      type: 'paragraph' | 'ordered' | 'bullet' | 'heading1' | 'heading2';
+      index: number;
+      runs: Array<{
+        text: string;
+        bold: boolean;
+        italic: boolean;
+        underline: boolean;
+        link?: string;
+      }>;
+    }> = [];
+    let orderedIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = blockPattern.exec(normalized)) !== null) {
+      const tag = match[1].toLowerCase();
+      let type: 'paragraph' | 'ordered' | 'bullet' | 'heading1' | 'heading2' =
+        'paragraph';
+
+      if (tag === 'h1') {
+        type = 'heading1';
+      } else if (tag === 'h2') {
+        type = 'heading2';
+      } else if (tag === 'li') {
+        type = /data-list="ordered"/i.test(match[2]) ? 'ordered' : 'bullet';
+      }
+
+      if (type === 'ordered') {
+        orderedIndex += 1;
+      } else {
+        orderedIndex = 0;
+      }
+
+      blocks.push({
+        type,
+        index: type === 'ordered' ? orderedIndex : blocks.length + 1,
+        runs: this.extractRichTextRuns(match[3]),
+      });
     }
 
-    doc
-      .fillColor('#0f172a')
-      .fontSize(11)
-      .text('Debate', left + 18, cursorY);
-    cursorY += 16;
-    doc
-      .fillColor('#334155')
-      .fontSize(10)
-      .text(debateText, left + 18, cursorY, {
-        width: width - 36,
-      });
-    cursorY += Math.max(debateHeight, 18) + 12;
+    if (blocks.length > 0) {
+      return blocks;
+    }
 
-    doc
-      .fillColor('#0f172a')
-      .fontSize(11)
-      .text('Acuerdo', left + 18, cursorY);
-    cursorY += 16;
-    doc
-      .fillColor('#334155')
-      .fontSize(10)
-      .text(acuerdoText, left + 18, cursorY, {
-        width: width - 36,
-      });
+    return [
+      {
+        type: 'paragraph',
+        index: 1,
+        runs: this.extractRichTextRuns(normalized),
+      },
+    ];
+  }
 
-    doc.y = effectiveTop + cardHeight + 14;
+  private normalizeRichHtml(html: string) {
+    return html
+      .replace(/<p><br><\/p>/gi, '<p></p>')
+      .replace(/<div>/gi, '<p>')
+      .replace(/<\/div>/gi, '</p>')
+      .replace(/<ol>/gi, '')
+      .replace(/<\/ol>/gi, '')
+      .replace(/<ul>/gi, '')
+      .replace(/<\/ul>/gi, '');
+  }
+
+  private getRichTextBlockStyle(
+    type: 'paragraph' | 'ordered' | 'bullet' | 'heading1' | 'heading2',
+  ) {
+    switch (type) {
+      case 'heading1':
+        return {
+          fontSize: 15,
+          bold: true,
+          color: '#0f172a',
+          spacingBefore: 4,
+          spacingAfter: 8,
+        };
+      case 'heading2':
+        return {
+          fontSize: 12,
+          bold: true,
+          color: '#1e293b',
+          spacingBefore: 2,
+          spacingAfter: 6,
+        };
+      default:
+        return {
+          fontSize: 10,
+          bold: false,
+          color: '#334155',
+          spacingBefore: 0,
+          spacingAfter: 4,
+        };
+    }
+  }
+
+  private extractRichTextRuns(html: string) {
+    const runs: Array<{
+      text: string;
+      bold: boolean;
+      italic: boolean;
+      underline: boolean;
+      link?: string;
+    }> = [];
+
+    const sanitized = html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>');
+
+    const tagPattern = /<(\/?)(strong|b|em|i|u|a)(?:\s+[^>]*)?>/gi;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    let bold = false;
+    let italic = false;
+    let underline = false;
+    let link: string | undefined;
+
+    while ((match = tagPattern.exec(sanitized)) !== null) {
+      const plainText = sanitized.slice(lastIndex, match.index).replace(/<[^>]+>/g, '');
+
+      if (plainText) {
+        runs.push({
+          text: plainText,
+          bold,
+          italic,
+          underline,
+          ...(link ? { link } : {}),
+        });
+      }
+
+      const isClosing = match[1] === '/';
+      const tag = match[2].toLowerCase();
+
+      if (tag === 'strong' || tag === 'b') {
+        bold = !isClosing;
+      }
+
+      if (tag === 'em' || tag === 'i') {
+        italic = !isClosing;
+      }
+
+      if (tag === 'u') {
+        underline = !isClosing;
+      }
+
+      if (tag === 'a') {
+        if (isClosing) {
+          link = undefined;
+        } else {
+          link = this.extractLinkHref(match[0]);
+        }
+      }
+
+      lastIndex = tagPattern.lastIndex;
+    }
+
+    const remainingText = sanitized.slice(lastIndex).replace(/<[^>]+>/g, '');
+
+    if (remainingText) {
+      runs.push({
+        text: remainingText,
+        bold,
+        italic,
+        underline,
+        ...(link ? { link } : {}),
+      });
+    }
+
+    if (runs.length === 0) {
+      runs.push({
+        text: '',
+        bold: false,
+        italic: false,
+        underline: false,
+      });
+    }
+
+    return runs;
+  }
+
+  private sanitizeRichTextHtml(html: string) {
+    return html.replace(
+      /<a\b([^>]*)href=(["'])(.*?)\2([^>]*)>/gi,
+      (_, before: string, quote: string, href: string, after: string) => {
+        const normalizedHref = this.normalizeAllowedLink(href);
+
+        if (!normalizedHref) {
+          return '<a>';
+        }
+
+        return `<a${before}href=${quote}${normalizedHref}${quote}${after}>`;
+      },
+    );
+  }
+
+  private extractLinkHref(tag: string) {
+    const hrefMatch = tag.match(/href=(["'])(.*?)\1/i);
+
+    if (!hrefMatch) {
+      return undefined;
+    }
+
+    return this.normalizeAllowedLink(hrefMatch[2]);
+  }
+
+  private normalizeAllowedLink(href: string) {
+    const value = href.trim();
+
+    if (!/^https?:\/\//i.test(value)) {
+      return undefined;
+    }
+
+    return value;
   }
 
   private formatDate(value: Date) {

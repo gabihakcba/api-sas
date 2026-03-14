@@ -22,12 +22,10 @@ export class CreateTemarioConsejoDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(1000)
   debate?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(1000)
   acuerdo?: string;
 
   @IsOptional()
