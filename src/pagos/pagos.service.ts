@@ -45,6 +45,18 @@ export class PagosService {
     private readonly scopeFilterService: ScopeFilterService,
   ) {}
 
+  private readonly createOrUpdatePagoInput!: {
+    monto: number;
+    detalles?: string;
+    fechaPago?: Date;
+    idCuentaDinero: number;
+    idMetodoPago: number;
+    idConceptoPago: number;
+    idMiembro: number;
+    idCuentaOrigen?: number | null;
+    idEvento?: number;
+  };
+
   async findAll(user: AuthenticatedUser, paginationQuery: PagosQueryDto) {
     const page = paginationQuery.page ?? 1;
     const limit = paginationQuery.limit ?? 10;
@@ -468,7 +480,7 @@ export class PagosService {
 
   private async resolvePagoData(
     tx: Prisma.TransactionClient,
-    dto: CreatePagoDto,
+    dto: typeof this.createOrUpdatePagoInput,
     user: AuthenticatedUser,
   ) {
     const monto = new Prisma.Decimal(dto.monto);
@@ -485,7 +497,7 @@ export class PagosService {
 
     let cuentaOrigen: VisibleCuenta | null = null;
 
-    if (dto.idCuentaOrigen) {
+    if (dto.idCuentaOrigen != null) {
       if (dto.idCuentaOrigen === dto.idCuentaDinero) {
         throw new BadRequestException(
           'La cuenta de origen y destino no pueden ser la misma.',

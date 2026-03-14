@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsDate,
   IsInt,
@@ -47,9 +47,10 @@ export class UpdatePagoDto {
   idMiembro?: number;
 
   @IsOptional()
+  @Transform(({ value }) => (value === null ? null : Number(value)))
   @IsInt()
   @Min(1)
-  idCuentaOrigen?: number;
+  idCuentaOrigen?: number | null;
 
   @IsOptional()
   @IsInt()
