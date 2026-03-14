@@ -47,7 +47,13 @@ export class UpdatePagoDto {
   idMiembro?: number;
 
   @IsOptional()
-  @Transform(({ value }) => (value === null ? null : Number(value)))
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') {
+      return value === null ? null : undefined;
+    }
+
+    return Number(value);
+  })
   @IsInt()
   @Min(1)
   idCuentaOrigen?: number | null;
@@ -56,4 +62,36 @@ export class UpdatePagoDto {
   @IsInt()
   @Min(1)
   idEvento?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === '') {
+      return undefined;
+    }
+    return value;
+  })
+  @IsString()
+  comprobantePagoBase64?: string | null;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === '') {
+      return undefined;
+    }
+    return value;
+  })
+  @IsString()
+  @MaxLength(255)
+  comprobantePagoMimeType?: string | null;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === '') {
+      return undefined;
+    }
+    return value;
+  })
+  @IsString()
+  @MaxLength(255)
+  comprobantePagoNombre?: string | null;
 }

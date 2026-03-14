@@ -410,6 +410,9 @@ model Pago {
   id                Int      @id @default(autoincrement())
   monto             Decimal  @db.Decimal(15, 2)
   detalles          String?
+  comprobante_pago  Bytes?
+  comprobante_pago_mime String?
+  comprobante_pago_nombre String?
   fecha_pago        DateTime @default(now())
   codigo_validacion String   @unique @default(uuid())
 

@@ -74,6 +74,25 @@ export class PagosController {
     res.send(receipt.buffer);
   }
 
+  @Get(':id/comprobante-pago')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('READ:PAGO')
+  async getAttachedReceipt(
+    @Request() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    const receipt = await this.pagosService.getAttachedReceipt(id, req.user!);
+
+    res.setHeader('Content-Type', receipt.mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${receipt.filename}"`,
+    );
+
+    res.send(receipt.buffer);
+  }
+
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard, PermissionsGuard)

@@ -50,4 +50,18 @@ export class CreatePagoDto {
   @IsInt()
   @Min(1)
   idEvento?: number;
+
+  @IsOptional()
+  @IsString()
+  comprobantePagoBase64?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  comprobantePagoMimeType?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  comprobantePagoNombre?: string;
 }

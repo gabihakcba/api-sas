@@ -55,6 +55,9 @@ export class PagosService {
     idMiembro: number;
     idCuentaOrigen?: number | null;
     idEvento?: number;
+    comprobantePagoBase64?: string | null;
+    comprobantePagoMimeType?: string | null;
+    comprobantePagoNombre?: string | null;
   };
 
   async findAll(user: AuthenticatedUser, paginationQuery: PagosQueryDto) {
@@ -298,6 +301,9 @@ export class PagosService {
         data: {
           monto: data.monto,
           detalles: data.detalles,
+          comprobante_pago: data.comprobantePago,
+          comprobante_pago_mime: data.comprobantePagoMimeType,
+          comprobante_pago_nombre: data.comprobantePagoNombre,
           fecha_pago: data.fechaPago,
           id_cuenta_dinero: data.idCuentaDinero,
           id_cuenta_origen: data.idCuentaOrigen,
@@ -338,6 +344,18 @@ export class PagosService {
             dto.idEvento !== undefined
               ? dto.idEvento
               : (existing.Evento?.id ?? undefined),
+          comprobantePagoBase64:
+            dto.comprobantePagoBase64 !== undefined
+              ? dto.comprobantePagoBase64
+              : undefined,
+          comprobantePagoMimeType:
+            dto.comprobantePagoMimeType !== undefined
+              ? dto.comprobantePagoMimeType
+              : undefined,
+          comprobantePagoNombre:
+            dto.comprobantePagoNombre !== undefined
+              ? dto.comprobantePagoNombre
+              : undefined,
         },
         user,
       );
@@ -367,6 +385,9 @@ export class PagosService {
         data: {
           monto: resolved.monto,
           detalles: resolved.detalles,
+          comprobante_pago: resolved.comprobantePago,
+          comprobante_pago_mime: resolved.comprobantePagoMimeType,
+          comprobante_pago_nombre: resolved.comprobantePagoNombre,
           fecha_pago: resolved.fechaPago,
           id_cuenta_dinero: resolved.idCuentaDinero,
           id_cuenta_origen: resolved.idCuentaOrigen,
@@ -410,6 +431,8 @@ export class PagosService {
       id: true,
       monto: true,
       detalles: true,
+      comprobante_pago_mime: true,
+      comprobante_pago_nombre: true,
       fecha_pago: true,
       codigo_validacion: true,
       Miembro: {
@@ -459,6 +482,37 @@ export class PagosService {
         },
       },
     } satisfies Prisma.PagoSelect;
+  }
+
+  async getAttachedReceipt(id: number, user: AuthenticatedUser) {
+    const pago = await this.prisma.pago.findFirst({
+      where: this.scopeFilterService.mergeWhere(
+        {
+          id,
+          borrado: false,
+        },
+        this.scopeFilterService.forPagos(user),
+      ),
+      select: {
+        comprobante_pago: true,
+        comprobante_pago_mime: true,
+        comprobante_pago_nombre: true,
+      },
+    });
+
+    if (!pago) {
+      throw new NotFoundException('El pago indicado no existe.');
+    }
+
+    if (!pago.comprobante_pago || !pago.comprobante_pago_mime) {
+      throw new NotFoundException('El pago no tiene comprobante adjunto.');
+    }
+
+    return {
+      buffer: Buffer.from(pago.comprobante_pago),
+      mimeType: pago.comprobante_pago_mime,
+      filename: pago.comprobante_pago_nombre ?? 'comprobante-pago-adjunto',
+    };
   }
 
   private async findOneWithinClient(
@@ -569,6 +623,11 @@ export class PagosService {
       idMiembro: dto.idMiembro,
       idResponsable: responsableId,
       idEvento: dto.idEvento ?? null,
+      ...this.parseAttachedReceipt(
+        dto.comprobantePagoBase64,
+        dto.comprobantePagoMimeType,
+        dto.comprobantePagoNombre,
+      ),
     };
   }
 
@@ -1335,5 +1394,62 @@ export class PagosService {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(Number(value));
+  }
+
+  private parseAttachedReceipt(
+    base64: string | null | undefined,
+    mimeType: string | null | undefined,
+    fileName: string | null | undefined,
+  ) {
+    if (base64 === undefined) {
+      return {
+        comprobantePago: undefined,
+        comprobantePagoMimeType: undefined,
+        comprobantePagoNombre: undefined,
+      };
+    }
+
+    if (base64 === null) {
+      return {
+        comprobantePago: null,
+        comprobantePagoMimeType: null,
+        comprobantePagoNombre: null,
+      };
+    }
+
+    if (!mimeType) {
+      throw new BadRequestException(
+        'El comprobante adjunto requiere indicar su tipo de archivo.',
+      );
+    }
+
+    const normalizedMime = mimeType.trim().toLowerCase();
+    const allowedMimeTypes = new Set([
+      'application/pdf',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/webp',
+    ]);
+
+    if (!allowedMimeTypes.has(normalizedMime)) {
+      throw new BadRequestException(
+        'El comprobante adjunto debe ser un PDF o una imagen válida.',
+      );
+    }
+
+    const match = base64.match(/^data:[^;]+;base64,(.+)$/);
+    const normalizedBase64 = match ? match[1] : base64;
+    const buffer = Buffer.from(normalizedBase64, 'base64');
+
+    if (buffer.length === 0) {
+      throw new BadRequestException('El comprobante adjunto no es válido.');
+    }
+
+    return {
+      comprobantePago: buffer,
+      comprobantePagoMimeType: normalizedMime,
+      comprobantePagoNombre: fileName?.trim() || 'comprobante-adjunto',
+    };
   }
 }
