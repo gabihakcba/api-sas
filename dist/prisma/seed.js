@@ -20,6 +20,7 @@ const SECRETARIA_TESORERIA_RESOURCES = [
     client_1.RESOURCE.CUENTA,
     client_1.RESOURCE.MIEMBRO,
     client_1.RESOURCE.PROTAGONISTA,
+    client_1.RESOURCE.ADULTO,
     client_1.RESOURCE.RESPONSABLE,
     client_1.RESOURCE.RELACION,
     client_1.RESOURCE.PAGO,
@@ -191,6 +192,16 @@ const ADULT_CONSEJO_PERMISSIONS = {
 };
 const ROLE_DEFINITIONS = [
     {
+        nombre: 'ADM',
+        descripcion: 'Superusuario tecnico con acceso total a todos los recursos del sistema.',
+        permissions: [
+            {
+                actions: [client_1.ACTION.MANAGE],
+                resources: ALL_RESOURCES,
+            },
+        ],
+    },
+    {
         nombre: 'PROTAGONISTA',
         descripcion: 'Acceso personal a su caja y a la caja de la rama segun las reglas de filtrado del backend.',
         permissions: [
@@ -206,11 +217,7 @@ const ROLE_DEFINITIONS = [
         permissions: [
             {
                 actions: [client_1.ACTION.MANAGE],
-                resources: ALL_RESOURCES.filter((resource) => resource !== client_1.RESOURCE.ADULTO),
-            },
-            {
-                actions: [client_1.ACTION.READ],
-                resources: ADULTO_READONLY_RESOURCES,
+                resources: ALL_RESOURCES,
             },
             ADULT_CONCEPTO_PAGO_PERMISSIONS,
             ADULT_METODO_PAGO_PERMISSIONS,
@@ -566,8 +573,9 @@ async function seedAdminAccount(tx, roleIdByName) {
     const adminEmail = getRequiredEnv('SEED_ADMIN_EMAIL');
     const adminPassword = getRequiredEnv('SEED_ADMIN_PASSWORD');
     const jefaturaRoleId = roleIdByName.get('JEFATURA');
-    if (!jefaturaRoleId) {
-        throw new Error('El rol JEFATURA es obligatorio para crear el usuario admin.');
+    const admRoleId = roleIdByName.get('ADM');
+    if (!jefaturaRoleId || !admRoleId) {
+        throw new Error('Los roles JEFATURA y ADM son obligatorios para crear el usuario admin.');
     }
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
     const cuentaByUser = await tx.cuenta.findUnique({
@@ -639,6 +647,23 @@ async function seedAdminAccount(tx, roleIdByName) {
             data: {
                 id_cuenta: cuenta.id,
                 id_role: jefaturaRoleId,
+                tipo_scope: client_1.SCOPE.GLOBAL,
+            },
+        });
+    }
+    const admRoleAssignment = await tx.cuentaRole.findFirst({
+        where: {
+            id_cuenta: cuenta.id,
+            id_role: admRoleId,
+            tipo_scope: client_1.SCOPE.GLOBAL,
+            id_scope: null,
+        },
+    });
+    if (!admRoleAssignment) {
+        await tx.cuentaRole.create({
+            data: {
+                id_cuenta: cuenta.id,
+                id_role: admRoleId,
                 tipo_scope: client_1.SCOPE.GLOBAL,
             },
         });

@@ -22,6 +22,7 @@ const SECRETARIA_TESORERIA_RESOURCES = [
   RESOURCE.CUENTA,
   RESOURCE.MIEMBRO,
   RESOURCE.PROTAGONISTA,
+  RESOURCE.ADULTO,
   RESOURCE.RESPONSABLE,
   RESOURCE.RELACION,
   RESOURCE.PAGO,
@@ -224,6 +225,17 @@ const ADULT_CONSEJO_PERMISSIONS: RoleDefinition['permissions'][number] = {
 
 const ROLE_DEFINITIONS: RoleDefinition[] = [
   {
+    nombre: 'ADM',
+    descripcion:
+      'Superusuario tecnico con acceso total a todos los recursos del sistema.',
+    permissions: [
+      {
+        actions: [ACTION.MANAGE],
+        resources: ALL_RESOURCES,
+      },
+    ],
+  },
+  {
     nombre: 'PROTAGONISTA',
     descripcion:
       'Acceso personal a su caja y a la caja de la rama segun las reglas de filtrado del backend.',
@@ -241,13 +253,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
     permissions: [
       {
         actions: [ACTION.MANAGE],
-        resources: ALL_RESOURCES.filter(
-          (resource) => resource !== RESOURCE.ADULTO,
-        ),
-      },
-      {
-        actions: [ACTION.READ],
-        resources: ADULTO_READONLY_RESOURCES,
+        resources: ALL_RESOURCES,
       },
       ADULT_CONCEPTO_PAGO_PERMISSIONS,
       ADULT_METODO_PAGO_PERMISSIONS,
@@ -683,10 +689,11 @@ async function seedAdminAccount(
   const adminPassword = getRequiredEnv('SEED_ADMIN_PASSWORD');
 
   const jefaturaRoleId = roleIdByName.get('JEFATURA');
+  const admRoleId = roleIdByName.get('ADM');
 
-  if (!jefaturaRoleId) {
+  if (!jefaturaRoleId || !admRoleId) {
     throw new Error(
-      'El rol JEFATURA es obligatorio para crear el usuario admin.',
+      'Los roles JEFATURA y ADM son obligatorios para crear el usuario admin.',
     );
   }
 
@@ -769,6 +776,25 @@ async function seedAdminAccount(
       data: {
         id_cuenta: cuenta.id,
         id_role: jefaturaRoleId,
+        tipo_scope: SCOPE.GLOBAL,
+      },
+    });
+  }
+
+  const admRoleAssignment = await tx.cuentaRole.findFirst({
+    where: {
+      id_cuenta: cuenta.id,
+      id_role: admRoleId,
+      tipo_scope: SCOPE.GLOBAL,
+      id_scope: null,
+    },
+  });
+
+  if (!admRoleAssignment) {
+    await tx.cuentaRole.create({
+      data: {
+        id_cuenta: cuenta.id,
+        id_role: admRoleId,
         tipo_scope: SCOPE.GLOBAL,
       },
     });
