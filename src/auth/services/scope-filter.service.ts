@@ -87,16 +87,23 @@ export class ScopeFilterService {
       return {};
     }
 
+    const groupCashFilter: Prisma.CuentaDineroWhereInput = {
+      id_miembro: null,
+      id_rama: null,
+      Area: {
+        nombre: 'Jefatura',
+        borrado: false,
+      },
+    };
+
     const memberProfileWhere = this.buildCuentaDineroMemberProfileFilters(user);
     const scopeFilters = this.buildCuentaDineroFilters(user);
 
-    if (memberProfileWhere.length === 0 && scopeFilters.length === 0) {
-      return {
-        id: -1,
-      };
-    }
-
-    return this.toWhereInput([...scopeFilters, ...memberProfileWhere]);
+    return this.toWhereInput([
+      groupCashFilter,
+      ...scopeFilters,
+      ...memberProfileWhere,
+    ]);
   }
 
   mergeWhere<TWhere extends object>(
