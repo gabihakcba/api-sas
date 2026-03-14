@@ -13,6 +13,8 @@ import { PagosModule } from './pagos/pagos.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProtagonistasModule } from './protagonistas/protagonistas.module';
 import { RamasModule } from './ramas/ramas.module';
+import { RelacionesModule } from './relaciones/relaciones.module';
+import { ResponsablesModule } from './responsables/responsables.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { RamasModule } from './ramas/ramas.module';
     ProtagonistasModule,
     AdultosModule,
     RamasModule,
+    RelacionesModule,
+    ResponsablesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

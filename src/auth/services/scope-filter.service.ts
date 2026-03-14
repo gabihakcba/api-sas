@@ -41,6 +41,16 @@ export class ScopeFilterService {
     return this.toWhereInput(this.buildAdultoFilters(user.scopes));
   }
 
+  forResponsables(
+    user: AuthenticatedUser,
+  ): ScopedWhere<Prisma.ResponsableWhereInput> {
+    if (this.hasUnrestrictedAccess(user)) {
+      return {};
+    }
+
+    return this.toWhereInput(this.buildResponsableFilters(user.scopes));
+  }
+
   forPagos(user: AuthenticatedUser): ScopedWhere<Prisma.PagoWhereInput> {
     if (this.hasUnrestrictedCuentaDineroAccess(user)) {
       return {};
@@ -231,6 +241,69 @@ export class ScopeFilterService {
                   },
                 },
               ],
+            },
+          },
+        });
+      }
+    }
+
+    return filters;
+  }
+
+  private buildResponsableFilters(
+    scopes: AuthenticatedScope[],
+  ): Prisma.ResponsableWhereInput[] {
+    const filters: Prisma.ResponsableWhereInput[] = [];
+
+    for (const scope of scopes) {
+      if (scope.scopeId == null) {
+        continue;
+      }
+
+      if (scope.scopeType === SCOPE.RAMA) {
+        filters.push({
+          Responsabilidad: {
+            some: {
+              borrado: false,
+              Protagonista: {
+                borrado: false,
+                Miembro: {
+                  borrado: false,
+                  MiembroRama: {
+                    some: {
+                      id_rama: scope.scopeId,
+                      borrado: false,
+                      fecha_egreso: null,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+      }
+
+      if (scope.scopeType === SCOPE.AREA) {
+        filters.push({
+          Responsabilidad: {
+            some: {
+              borrado: false,
+              Protagonista: {
+                borrado: false,
+                Miembro: {
+                  borrado: false,
+                  MiembroRama: {
+                    some: {
+                      borrado: false,
+                      fecha_egreso: null,
+                      Rama: {
+                        id_area: scope.scopeId,
+                        borrado: false,
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         });

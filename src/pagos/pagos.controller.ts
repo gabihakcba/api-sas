@@ -93,6 +93,16 @@ export class PagosController {
     res.send(receipt.buffer);
   }
 
+  @Get(':id/whatsapp')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('READ:PAGO')
+  async getWhatsappShareData(
+    @Request() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.pagosService.getWhatsappShareData(id, req.user!);
+  }
+
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard, PermissionsGuard)

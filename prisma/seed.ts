@@ -181,6 +181,17 @@ const METODO_PAGO_DEFINITIONS = [
   },
 ] as const;
 
+const RELACION_DEFINITIONS = [
+  { tipo: 'Madre', descripcion: 'Responsable con vínculo materno.' },
+  { tipo: 'Padre', descripcion: 'Responsable con vínculo paterno.' },
+  { tipo: 'Tio', descripcion: 'Responsable con vínculo de tío.' },
+  { tipo: 'Tia', descripcion: 'Responsable con vínculo de tía.' },
+  { tipo: 'Abuelo', descripcion: 'Responsable con vínculo de abuelo.' },
+  { tipo: 'Abuela', descripcion: 'Responsable con vínculo de abuela.' },
+  { tipo: 'Hermano', descripcion: 'Responsable con vínculo de hermano.' },
+  { tipo: 'Hermana', descripcion: 'Responsable con vínculo de hermana.' },
+] as const;
+
 type RoleDefinition = {
   nombre: string;
   descripcion: string;
@@ -583,6 +594,37 @@ async function seedMetodosPago(tx: Prisma.TransactionClient): Promise<void> {
   }
 }
 
+async function seedRelaciones(tx: Prisma.TransactionClient): Promise<void> {
+  for (const relacion of RELACION_DEFINITIONS) {
+    const existing = await tx.relacion.findFirst({
+      where: {
+        tipo: relacion.tipo,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existing) {
+      await tx.relacion.update({
+        where: { id: existing.id },
+        data: {
+          tipo: relacion.tipo,
+          descripcion: relacion.descripcion,
+        },
+      });
+      continue;
+    }
+
+    await tx.relacion.create({
+      data: {
+        tipo: relacion.tipo,
+        descripcion: relacion.descripcion,
+      },
+    });
+  }
+}
+
 async function seedCuentasDineroBase(
   tx: Prisma.TransactionClient,
 ): Promise<void> {
@@ -824,6 +866,7 @@ async function main() {
     await seedPosicionesArea(tx);
     await seedConceptosPago(tx);
     await seedMetodosPago(tx);
+    await seedRelaciones(tx);
     await seedCuentasDineroBase(tx);
     await seedAdminAccount(tx, roleIdByName);
   });

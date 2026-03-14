@@ -515,6 +515,104 @@ export class PagosService {
     };
   }
 
+  async getWhatsappShareData(id: number, user: AuthenticatedUser) {
+    const pago = await this.prisma.pago.findFirst({
+      where: this.scopeFilterService.mergeWhere(
+        {
+          id,
+          borrado: false,
+        },
+        this.scopeFilterService.forPagos(user),
+      ),
+      select: {
+        id: true,
+        monto: true,
+        fecha_pago: true,
+        codigo_validacion: true,
+        ConceptoPago: {
+          select: {
+            nombre: true,
+          },
+        },
+        Miembro: {
+          select: {
+            nombre: true,
+            apellidos: true,
+            Protagonista: {
+              select: {
+                Responsabilidad: {
+                  where: {
+                    borrado: false,
+                    Responsable: {
+                      borrado: false,
+                      Miembro: {
+                        borrado: false,
+                        telefono: {
+                          not: null,
+                        },
+                      },
+                    },
+                  },
+                  orderBy: {
+                    id: 'asc',
+                  },
+                  take: 1,
+                  select: {
+                    Responsable: {
+                      select: {
+                        Miembro: {
+                          select: {
+                            nombre: true,
+                            apellidos: true,
+                            telefono: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!pago) {
+      throw new NotFoundException('El pago indicado no existe.');
+    }
+
+    const firstResponsable =
+      pago.Miembro.Protagonista?.Responsabilidad[0]?.Responsable.Miembro;
+
+    if (!firstResponsable?.telefono) {
+      throw new NotFoundException(
+        'El pago no tiene un responsable con teléfono disponible para WhatsApp.',
+      );
+    }
+
+    const phone = this.normalizeWhatsappPhone(firstResponsable.telefono);
+
+    if (!phone) {
+      throw new BadRequestException(
+        'El teléfono del responsable no es válido para WhatsApp.',
+      );
+    }
+
+    return {
+      phone,
+      responsableNombre: `${firstResponsable.nombre} ${firstResponsable.apellidos}`.trim(),
+      message: [
+        `Hola ${firstResponsable.nombre},`,
+        `te compartimos el comprobante del pago ${pago.codigo_validacion}.`,
+        `Concepto: ${pago.ConceptoPago.nombre}.`,
+        `Importe: $${pago.monto.toString()}.`,
+        `Fecha: ${this.formatDate(pago.fecha_pago)}.`,
+        `Corresponde a ${pago.Miembro.nombre} ${pago.Miembro.apellidos}.`,
+      ].join('\n'),
+    };
+  }
+
   private async findOneWithinClient(
     client: PrismaService | Prisma.TransactionClient,
     id: number,
@@ -1451,5 +1549,27 @@ export class PagosService {
       comprobantePagoMimeType: normalizedMime,
       comprobantePagoNombre: fileName?.trim() || 'comprobante-adjunto',
     };
+  }
+
+  private normalizeWhatsappPhone(phone: string) {
+    const digits = phone.replace(/\D/g, '');
+
+    if (digits.length < 8) {
+      return null;
+    }
+
+    if (digits.startsWith('549')) {
+      return digits;
+    }
+
+    if (digits.startsWith('54')) {
+      return `549${digits.slice(2)}`;
+    }
+
+    if (digits.startsWith('0')) {
+      return `549${digits.slice(1)}`;
+    }
+
+    return `549${digits}`;
   }
 }
