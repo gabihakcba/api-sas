@@ -36,4 +36,9 @@ export class UpdateCuentaDineroDto {
   @IsInt()
   @Min(1)
   idRama?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  idMiembro?: number;
 }

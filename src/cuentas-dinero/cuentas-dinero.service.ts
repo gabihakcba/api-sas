@@ -5,11 +5,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, SCOPE } from '@prisma/client';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { CuentasDineroQueryDto } from './dto/cuentas-dinero-query.dto';
 import { CreateCuentaDineroDto } from './dto/create-cuenta-dinero.dto';
 import { UpdateCuentaDineroDto } from './dto/update-cuenta-dinero.dto';
 
@@ -20,14 +20,78 @@ export class CuentasDineroService {
     private readonly scopeFilterService: ScopeFilterService,
   ) {}
 
-  async findAll(user: AuthenticatedUser, paginationQuery: PaginationQueryDto) {
+  async findAll(user: AuthenticatedUser, paginationQuery: CuentasDineroQueryDto) {
     const page = paginationQuery.page ?? 1;
     const limit = paginationQuery.limit ?? 10;
     const skip = (page - 1) * limit;
+    const searchTerm = paginationQuery.q?.trim();
 
     const where = this.scopeFilterService.mergeWhere(
       {
         borrado: false,
+        ...(paginationQuery.idArea ? { id_area: paginationQuery.idArea } : {}),
+        ...(paginationQuery.idRama ? { id_rama: paginationQuery.idRama } : {}),
+        ...(paginationQuery.idMiembro
+          ? { id_miembro: paginationQuery.idMiembro }
+          : {}),
+        ...(searchTerm
+          ? {
+              OR: [
+                {
+                  nombre: {
+                    contains: searchTerm,
+                    mode: Prisma.QueryMode.insensitive,
+                  },
+                },
+                {
+                  descripcion: {
+                    contains: searchTerm,
+                    mode: Prisma.QueryMode.insensitive,
+                  },
+                },
+                {
+                  Area: {
+                    nombre: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                },
+                {
+                  Rama: {
+                    nombre: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                },
+                {
+                  Miembro: {
+                    OR: [
+                      {
+                        nombre: {
+                          contains: searchTerm,
+                          mode: Prisma.QueryMode.insensitive,
+                        },
+                      },
+                      {
+                        apellidos: {
+                          contains: searchTerm,
+                          mode: Prisma.QueryMode.insensitive,
+                        },
+                      },
+                      {
+                        dni: {
+                          contains: searchTerm,
+                          mode: Prisma.QueryMode.insensitive,
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            }
+          : {}),
       },
       this.scopeFilterService.forCuentasDinero(user),
     );
@@ -47,6 +111,7 @@ export class CuentasDineroService {
           monto_actual: true,
           id_area: true,
           id_rama: true,
+          id_miembro: true,
           Area: {
             select: {
               id: true,
@@ -58,6 +123,14 @@ export class CuentasDineroService {
               id: true,
               nombre: true,
               id_area: true,
+            },
+          },
+          Miembro: {
+            select: {
+              id: true,
+              nombre: true,
+              apellidos: true,
+              dni: true,
             },
           },
           _count: {
@@ -86,7 +159,7 @@ export class CuentasDineroService {
   }
 
   async getOptions(user: AuthenticatedUser) {
-    const [areas, ramas] = await this.prisma.$transaction([
+    const [areas, ramas, miembros] = await this.prisma.$transaction([
       this.prisma.area.findMany({
         where: this.scopeFilterService.mergeWhere(
           { borrado: false },
@@ -110,11 +183,22 @@ export class CuentasDineroService {
           id_area: true,
         },
       }),
+      this.prisma.miembro.findMany({
+        where: this.buildVisibleMiembroWhere(user),
+        orderBy: [{ apellidos: 'asc' }, { nombre: 'asc' }],
+        select: {
+          id: true,
+          nombre: true,
+          apellidos: true,
+          dni: true,
+        },
+      }),
     ]);
 
     return {
       areas,
       ramas,
+      miembros,
     };
   }
 
@@ -134,6 +218,7 @@ export class CuentasDineroService {
         monto_actual: true,
         id_area: true,
         id_rama: true,
+        id_miembro: true,
         Area: {
           select: {
             id: true,
@@ -145,6 +230,14 @@ export class CuentasDineroService {
             id: true,
             nombre: true,
             id_area: true,
+          },
+        },
+        Miembro: {
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+            dni: true,
           },
         },
         _count: {
@@ -170,6 +263,7 @@ export class CuentasDineroService {
     const assignment = await this.resolveAssignment(dto);
     await this.validateScopedAccess(user, assignment);
     await this.ensureUniqueName(dto.nombre, null);
+    await this.ensureUniqueMemberAssignment(assignment.idMiembro);
 
     return this.prisma.cuentaDinero.create({
       data: {
@@ -178,6 +272,7 @@ export class CuentasDineroService {
         monto_actual: new Prisma.Decimal(dto.montoActual),
         id_area: assignment.idArea ?? null,
         id_rama: assignment.idRama ?? null,
+        id_miembro: assignment.idMiembro ?? null,
       },
       select: {
         id: true,
@@ -186,6 +281,7 @@ export class CuentasDineroService {
         monto_actual: true,
         id_area: true,
         id_rama: true,
+        id_miembro: true,
         Area: {
           select: {
             id: true,
@@ -197,6 +293,14 @@ export class CuentasDineroService {
             id: true,
             nombre: true,
             id_area: true,
+          },
+        },
+        Miembro: {
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+            dni: true,
           },
         },
         _count: {
@@ -222,10 +326,12 @@ export class CuentasDineroService {
     const assignment = await this.resolveAssignment({
       idArea: dto.idArea ?? existing.id_area ?? undefined,
       idRama: dto.idRama ?? existing.id_rama ?? undefined,
+      idMiembro: dto.idMiembro ?? existing.id_miembro ?? undefined,
     });
 
     await this.validateScopedAccess(user, assignment);
     await this.ensureUniqueName(dto.nombre ?? existing.nombre, id);
+    await this.ensureUniqueMemberAssignment(assignment.idMiembro, id);
 
     return this.prisma.cuentaDinero.update({
       where: { id },
@@ -239,6 +345,7 @@ export class CuentasDineroService {
           : {}),
         id_area: assignment.idArea ?? null,
         id_rama: assignment.idRama ?? null,
+        id_miembro: assignment.idMiembro ?? null,
       },
       select: {
         id: true,
@@ -247,6 +354,7 @@ export class CuentasDineroService {
         monto_actual: true,
         id_area: true,
         id_rama: true,
+        id_miembro: true,
         Area: {
           select: {
             id: true,
@@ -258,6 +366,14 @@ export class CuentasDineroService {
             id: true,
             nombre: true,
             id_area: true,
+          },
+        },
+        Miembro: {
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+            dni: true,
           },
         },
         _count: {
@@ -303,19 +419,50 @@ export class CuentasDineroService {
     }
   }
 
+  private async ensureUniqueMemberAssignment(
+    miembroId?: number,
+    currentId?: number,
+  ) {
+    if (!miembroId) {
+      return;
+    }
+
+    const existing = await this.prisma.cuentaDinero.findFirst({
+      where: {
+        id_miembro: miembroId,
+        borrado: false,
+        ...(currentId ? { NOT: { id: currentId } } : {}),
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        'Ese miembro ya tiene una cuenta de dinero activa asignada.',
+      );
+    }
+  }
+
   private async resolveAssignment(input: {
     idArea?: number;
     idRama?: number;
-  }): Promise<{ idArea?: number; idRama?: number }> {
-    if (input.idArea && input.idRama) {
+    idMiembro?: number;
+  }): Promise<{ idArea?: number; idRama?: number; idMiembro?: number }> {
+    const assignmentCount = [input.idArea, input.idRama, input.idMiembro].filter(
+      (value) => value !== undefined && value !== null,
+    ).length;
+
+    if (assignmentCount > 1) {
       throw new BadRequestException(
-        'La cuenta de dinero debe pertenecer a un area o a una rama, no a ambas.',
+        'La cuenta de dinero debe pertenecer a un area, una rama o un miembro, no a multiples asignaciones.',
       );
     }
 
-    if (!input.idArea && !input.idRama) {
+    if (assignmentCount === 0) {
       throw new BadRequestException(
-        'Debes indicar un area o una rama para la cuenta de dinero.',
+        'Debes indicar un area, una rama o un miembro para la cuenta de dinero.',
       );
     }
 
@@ -333,6 +480,24 @@ export class CuentasDineroService {
       }
 
       return { idArea: area.id };
+    }
+
+    if (input.idMiembro) {
+      const miembro = await this.prisma.miembro.findFirst({
+        where: {
+          id: input.idMiembro,
+          borrado: false,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!miembro) {
+        throw new NotFoundException('El miembro indicado no existe.');
+      }
+
+      return { idMiembro: miembro.id };
     }
 
     const rama = await this.prisma.rama.findFirst({
@@ -354,7 +519,7 @@ export class CuentasDineroService {
 
   private async validateScopedAccess(
     user: AuthenticatedUser,
-    assignment: { idArea?: number; idRama?: number },
+    assignment: { idArea?: number; idRama?: number; idMiembro?: number },
   ) {
     const scopedWhere = this.scopeFilterService.forCuentasDinero(user);
 
@@ -368,6 +533,7 @@ export class CuentasDineroService {
           borrado: false,
           ...(assignment.idArea ? { id_area: assignment.idArea } : {}),
           ...(assignment.idRama ? { id_rama: assignment.idRama } : {}),
+          ...(assignment.idMiembro ? { id_miembro: assignment.idMiembro } : {}),
         },
         scopedWhere,
       ),
@@ -403,9 +569,194 @@ export class CuentasDineroService {
         }
       }
 
+      if (assignment.idMiembro) {
+        const miembroMatch = await this.prisma.miembro.findFirst({
+          where: this.buildVisibleMiembroWhere(user, assignment.idMiembro),
+          select: { id: true },
+        });
+
+        if (miembroMatch) {
+          return;
+        }
+      }
+
       throw new ForbiddenException(
         'El usuario no posee un scope valido para esta cuenta de dinero.',
       );
     }
+  }
+
+  private buildVisibleMiembroWhere(
+    user: AuthenticatedUser,
+    onlyMemberId?: number,
+  ): Prisma.MiembroWhereInput {
+    if (
+      user.roles.includes('ADM') ||
+      user.roles.includes('OWN') ||
+      user.roles.includes('JEFATURA') ||
+      user.roles.includes('SECRETARIA_TESORERIA')
+    ) {
+      return {
+        borrado: false,
+        ...(onlyMemberId ? { id: onlyMemberId } : {}),
+      };
+    }
+
+    const filters: Prisma.MiembroWhereInput[] = [];
+
+    for (const scope of user.scopes) {
+      if (scope.scopeId == null) {
+        continue;
+      }
+
+      const isAdultScopedRole = ['JEFATURA_RAMA', 'AYUDANTE_RAMA', 'INTENDENCIA'].includes(
+        scope.role,
+      );
+
+      if (!isAdultScopedRole) {
+        continue;
+      }
+
+      if (scope.scopeType === SCOPE.RAMA) {
+        filters.push({
+          OR: [
+            {
+              MiembroRama: {
+                some: {
+                  id_rama: scope.scopeId,
+                  borrado: false,
+                  fecha_egreso: null,
+                },
+              },
+            },
+            {
+              Adulto: {
+                is: {
+                  borrado: false,
+                  activo: true,
+                  EquipoArea: {
+                    some: {
+                      id_rama: scope.scopeId,
+                      borrado: false,
+                      activo: true,
+                      fecha_fin: null,
+                    },
+                  },
+                },
+              },
+            },
+            {
+              Responsable: {
+                is: {
+                  borrado: false,
+                  Responsabilidad: {
+                    some: {
+                      borrado: false,
+                      Protagonista: {
+                        borrado: false,
+                        Miembro: {
+                          MiembroRama: {
+                            some: {
+                              id_rama: scope.scopeId,
+                              borrado: false,
+                              fecha_egreso: null,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        });
+      }
+
+      if (scope.scopeType === SCOPE.AREA) {
+        filters.push({
+          OR: [
+            {
+              MiembroRama: {
+                some: {
+                  borrado: false,
+                  fecha_egreso: null,
+                  Rama: {
+                    id_area: scope.scopeId,
+                    borrado: false,
+                  },
+                },
+              },
+            },
+            {
+              Adulto: {
+                is: {
+                  borrado: false,
+                  activo: true,
+                  EquipoArea: {
+                    some: {
+                      borrado: false,
+                      activo: true,
+                      fecha_fin: null,
+                      OR: [
+                        { id_area: scope.scopeId },
+                        {
+                          Rama: {
+                            id_area: scope.scopeId,
+                            borrado: false,
+                          },
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+            {
+              Responsable: {
+                is: {
+                  borrado: false,
+                  Responsabilidad: {
+                    some: {
+                      borrado: false,
+                      Protagonista: {
+                        borrado: false,
+                        Miembro: {
+                          MiembroRama: {
+                            some: {
+                              borrado: false,
+                              fecha_egreso: null,
+                              Rama: {
+                                id_area: scope.scopeId,
+                                borrado: false,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        });
+      }
+    }
+
+    if (filters.length === 0) {
+      return {
+        id: -1,
+        borrado: false,
+      };
+    }
+
+    return {
+      AND: [
+        { borrado: false },
+        ...(onlyMemberId ? [{ id: onlyMemberId }] : []),
+        filters.length === 1 ? filters[0] : { OR: filters },
+      ],
+    };
   }
 }

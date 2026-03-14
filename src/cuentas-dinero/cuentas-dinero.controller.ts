@@ -20,8 +20,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { ScopesGuard } from '../auth/guards/scopes.guard';
 import { AuthenticatedRequest } from '../auth/types/auth-request.types';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CuentasDineroService } from './cuentas-dinero.service';
+import { CuentasDineroQueryDto } from './dto/cuentas-dinero-query.dto';
 import { CreateCuentaDineroDto } from './dto/create-cuenta-dinero.dto';
 import { UpdateCuentaDineroDto } from './dto/update-cuenta-dinero.dto';
 
@@ -34,9 +34,9 @@ export class CuentasDineroController {
   @CheckPermissions('READ:CUENTA_DINERO')
   async findAll(
     @Request() req: AuthenticatedRequest,
-    @Query() paginationQuery: PaginationQueryDto,
+    @Query() query: CuentasDineroQueryDto,
   ) {
-    return this.cuentasDineroService.findAll(req.user!, paginationQuery);
+    return this.cuentasDineroService.findAll(req.user!, query);
   }
 
   @Get('options')

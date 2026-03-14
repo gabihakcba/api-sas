@@ -14,7 +14,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { SCOPE } from '@prisma/client';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CheckPermissions } from '../auth/decorators/permissions.decorator';
 import { ScopeAccess } from '../auth/decorators/scopes.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -22,6 +21,7 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { ScopesGuard } from '../auth/guards/scopes.guard';
 import { AuthenticatedRequest } from '../auth/types/auth-request.types';
 import { AdultosService } from './adultos.service';
+import { AdultosQueryDto } from './dto/adultos-query.dto';
 import { CreateAdultoDto } from './dto/create-adulto.dto';
 import { UpdateAdultoDto } from './dto/update-adulto.dto';
 
@@ -34,9 +34,9 @@ export class AdultosController {
   @CheckPermissions('READ:MIEMBRO', 'READ:ADULTO')
   async findAll(
     @Request() req: AuthenticatedRequest,
-    @Query() paginationQuery: PaginationQueryDto,
+    @Query() query: AdultosQueryDto,
   ) {
-    return this.adultosService.findAll(req.user!, paginationQuery);
+    return this.adultosService.findAll(req.user!, query);
   }
 
   @Get('options')

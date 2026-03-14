@@ -4,11 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, SCOPE } from '@prisma/client';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import { CuentasService } from '../cuentas/cuentas.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AdultosQueryDto } from './dto/adultos-query.dto';
 import { CreateAdultoDto } from './dto/create-adulto.dto';
 import { UpdateAdultoDto } from './dto/update-adulto.dto';
 
@@ -20,18 +20,101 @@ export class AdultosService {
     private readonly scopeFilterService: ScopeFilterService,
   ) {}
 
-  async findAll(user: AuthenticatedUser, paginationQuery: PaginationQueryDto) {
+  async findAll(user: AuthenticatedUser, paginationQuery: AdultosQueryDto) {
     const page = paginationQuery.page ?? 1;
     const limit = paginationQuery.limit ?? 10;
     const skip = (page - 1) * limit;
+    const searchTerm = paginationQuery.q?.trim();
 
     const scopeWhere = this.scopeFilterService.forAdultos(user);
     const where = this.scopeFilterService.mergeWhere(
       {
         borrado: false,
+        ...(paginationQuery.esBecado !== undefined
+          ? { es_becado: paginationQuery.esBecado }
+          : {}),
+        ...(paginationQuery.activo !== undefined
+          ? { activo: paginationQuery.activo }
+          : {}),
         Miembro: {
           borrado: false,
+          ...(searchTerm
+            ? {
+                OR: [
+                  {
+                    nombre: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    apellidos: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    dni: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    email: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    telefono: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    totem: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    cualidad: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    Cuenta: {
+                      user: {
+                        contains: searchTerm,
+                        mode: Prisma.QueryMode.insensitive,
+                      },
+                    },
+                  },
+                ],
+              }
+            : {}),
         },
+        ...((paginationQuery.idArea || paginationQuery.idPosicion || paginationQuery.idRama)
+          ? {
+              EquipoArea: {
+                some: {
+                  borrado: false,
+                  activo: true,
+                  fecha_fin: null,
+                  ...(paginationQuery.idArea
+                    ? { id_area: paginationQuery.idArea }
+                    : {}),
+                  ...(paginationQuery.idPosicion
+                    ? { id_posicion: paginationQuery.idPosicion }
+                    : {}),
+                  ...(paginationQuery.idRama
+                    ? { id_rama: paginationQuery.idRama }
+                    : {}),
+                },
+              },
+            }
+          : {}),
       },
       scopeWhere,
     );
@@ -409,6 +492,13 @@ export class AdultosService {
           activo: true,
         },
       });
+
+      await this.ensureCuentaDineroAdulto(
+        tx,
+        cuentaMiembro.miembroId,
+        dto.nombre,
+        dto.apellidos,
+      );
 
       let cuentaRole: {
         id: number;
@@ -792,6 +882,43 @@ export class AdultosService {
     }
 
     return { area, posicion, rama };
+  }
+
+  private async ensureCuentaDineroAdulto(
+    tx: Prisma.TransactionClient,
+    miembroId: number,
+    nombre: string,
+    apellidos: string,
+  ) {
+    const existing = await tx.cuentaDinero.findFirst({
+      where: {
+        id_miembro: miembroId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const data = {
+      nombre: `Caja ${nombre} ${apellidos}`.trim(),
+      descripcion: `Cuenta personal del adulto ${nombre} ${apellidos}`.trim(),
+      id_miembro: miembroId,
+      id_area: null,
+      id_rama: null,
+      borrado: false,
+    };
+
+    if (existing) {
+      await tx.cuentaDinero.update({
+        where: { id: existing.id },
+        data,
+      });
+      return;
+    }
+
+    await tx.cuentaDinero.create({
+      data,
+    });
   }
 
   private validateScopeConfiguration(

@@ -14,7 +14,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { SCOPE } from '@prisma/client';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CheckPermissions } from '../auth/decorators/permissions.decorator';
 import { ScopeAccess } from '../auth/decorators/scopes.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -25,6 +24,7 @@ import { CreateProtagonistaDto } from './dto/create-protagonista.dto';
 import { ProtagonistaPaseDto } from './dto/protagonista-pase.dto';
 import { ProtagonistasService } from './protagonistas.service';
 import { UpdateProtagonistaDto } from './dto/update-protagonista.dto';
+import { ProtagonistasQueryDto } from './dto/protagonistas-query.dto';
 
 @Controller('protagonistas')
 export class ProtagonistasController {
@@ -35,9 +35,9 @@ export class ProtagonistasController {
   @CheckPermissions('READ:MIEMBRO', 'READ:PROTAGONISTA')
   async findAll(
     @Request() req: AuthenticatedRequest,
-    @Query() paginationQuery: PaginationQueryDto,
+    @Query() query: ProtagonistasQueryDto,
   ) {
-    return this.protagonistasService.findAll(req.user!, paginationQuery);
+    return this.protagonistasService.findAll(req.user!, query);
   }
 
   @Get(':id')

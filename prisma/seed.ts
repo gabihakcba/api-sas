@@ -603,6 +603,20 @@ async function seedCuentasDineroBase(
     throw new Error('No se pudo resolver el area Jefatura durante el seed.');
   }
 
+  const areaRama = await tx.area.findFirst({
+    where: {
+      nombre: 'Rama',
+      borrado: false,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!areaRama) {
+    throw new Error('No se pudo resolver el area Rama durante el seed.');
+  }
+
   const ramas = await tx.rama.findMany({
     where: {
       borrado: false,
@@ -660,7 +674,7 @@ async function seedCuentasDineroBase(
     const data = {
       nombre: `Caja ${rama.nombre}`,
       descripcion: `Cuenta de dinero asociada a la rama ${rama.nombre}.`,
-      id_area: null,
+      id_area: areaRama.id,
       id_rama: rama.id,
       id_miembro: null,
       borrado: false,

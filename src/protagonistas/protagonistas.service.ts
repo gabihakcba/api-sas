@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, SCOPE } from '@prisma/client';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,6 +7,7 @@ import { CuentasService } from '../cuentas/cuentas.service';
 import { CreateProtagonistaDto } from './dto/create-protagonista.dto';
 import { ProtagonistaPaseDto } from './dto/protagonista-pase.dto';
 import { UpdateProtagonistaDto } from './dto/update-protagonista.dto';
+import { ProtagonistasQueryDto } from './dto/protagonistas-query.dto';
 
 @Injectable()
 export class ProtagonistasService {
@@ -17,7 +17,7 @@ export class ProtagonistasService {
     private readonly scopeFilterService: ScopeFilterService,
   ) {}
 
-  async findAll(user: AuthenticatedUser, paginationQuery: PaginationQueryDto) {
+  async findAll(user: AuthenticatedUser, paginationQuery: ProtagonistasQueryDto) {
     const page = paginationQuery.page ?? 1;
     const limit = paginationQuery.limit ?? 10;
     const skip = (page - 1) * limit;
@@ -28,7 +28,123 @@ export class ProtagonistasService {
         borrado: false,
         Miembro: {
           borrado: false,
+          ...(paginationQuery.q
+            ? {
+                OR: [
+                  {
+                    nombre: {
+                      contains: paginationQuery.q.trim(),
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    apellidos: {
+                      contains: paginationQuery.q.trim(),
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    dni: {
+                      contains: paginationQuery.q.trim(),
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    email: {
+                      contains: paginationQuery.q.trim(),
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    telefono: {
+                      contains: paginationQuery.q.trim(),
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    totem: {
+                      contains: paginationQuery.q.trim(),
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    cualidad: {
+                      contains: paginationQuery.q.trim(),
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                ],
+              }
+            : {}),
         },
+        ...(paginationQuery.esBecado !== undefined
+          ? { es_becado: paginationQuery.esBecado }
+          : {}),
+        ...(paginationQuery.activo !== undefined
+          ? { activo: paginationQuery.activo }
+          : {}),
+        ...(paginationQuery.idRama
+          ? {
+              Miembro: {
+                borrado: false,
+                MiembroRama: {
+                  some: {
+                    id_rama: paginationQuery.idRama,
+                    borrado: false,
+                    fecha_egreso: null,
+                  },
+                },
+                ...(paginationQuery.q
+                  ? {
+                      OR: [
+                        {
+                          nombre: {
+                            contains: paginationQuery.q.trim(),
+                            mode: Prisma.QueryMode.insensitive,
+                          },
+                        },
+                        {
+                          apellidos: {
+                            contains: paginationQuery.q.trim(),
+                            mode: Prisma.QueryMode.insensitive,
+                          },
+                        },
+                        {
+                          dni: {
+                            contains: paginationQuery.q.trim(),
+                            mode: Prisma.QueryMode.insensitive,
+                          },
+                        },
+                        {
+                          email: {
+                            contains: paginationQuery.q.trim(),
+                            mode: Prisma.QueryMode.insensitive,
+                          },
+                        },
+                        {
+                          telefono: {
+                            contains: paginationQuery.q.trim(),
+                            mode: Prisma.QueryMode.insensitive,
+                          },
+                        },
+                        {
+                          totem: {
+                            contains: paginationQuery.q.trim(),
+                            mode: Prisma.QueryMode.insensitive,
+                          },
+                        },
+                        {
+                          cualidad: {
+                            contains: paginationQuery.q.trim(),
+                            mode: Prisma.QueryMode.insensitive,
+                          },
+                        },
+                      ],
+                    }
+                  : {}),
+              },
+            }
+          : {}),
       },
       scopeWhere,
     );

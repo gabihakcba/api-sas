@@ -17,8 +17,8 @@ import { CheckPermissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { AuthenticatedRequest } from '../auth/types/auth-request.types';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CreatePagoDto } from './dto/create-pago.dto';
+import { PagosQueryDto } from './dto/pagos-query.dto';
 import { UpdatePagoDto } from './dto/update-pago.dto';
 import { PagosService } from './pagos.service';
 
@@ -31,9 +31,9 @@ export class PagosController {
   @CheckPermissions('READ:PAGO')
   async findAll(
     @Request() req: AuthenticatedRequest,
-    @Query() paginationQuery: PaginationQueryDto,
+    @Query() query: PagosQueryDto,
   ) {
-    return this.pagosService.findAll(req.user!, paginationQuery);
+    return this.pagosService.findAll(req.user!, query);
   }
 
   @Get('options')

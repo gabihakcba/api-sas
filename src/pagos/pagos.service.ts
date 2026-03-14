@@ -10,10 +10,10 @@ import {
   AuthenticatedScope,
   AuthenticatedUser,
 } from '../auth/types/auth-request.types';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { CreatePagoDto } from './dto/create-pago.dto';
+import { PagosQueryDto } from './dto/pagos-query.dto';
 import { UpdatePagoDto } from './dto/update-pago.dto';
 
 type VisibleCuenta = {
@@ -42,14 +42,101 @@ export class PagosService {
     private readonly scopeFilterService: ScopeFilterService,
   ) {}
 
-  async findAll(user: AuthenticatedUser, paginationQuery: PaginationQueryDto) {
+  async findAll(user: AuthenticatedUser, paginationQuery: PagosQueryDto) {
     const page = paginationQuery.page ?? 1;
     const limit = paginationQuery.limit ?? 10;
     const skip = (page - 1) * limit;
+    const searchTerm = paginationQuery.q?.trim();
 
     const where = this.scopeFilterService.mergeWhere(
       {
         borrado: false,
+        ...(paginationQuery.idConceptoPago
+          ? { id_concepto_pago: paginationQuery.idConceptoPago }
+          : {}),
+        ...(paginationQuery.idMetodoPago
+          ? { id_metodo_pago: paginationQuery.idMetodoPago }
+          : {}),
+        ...(paginationQuery.idCuentaDinero
+          ? { id_cuenta_dinero: paginationQuery.idCuentaDinero }
+          : {}),
+        ...(paginationQuery.idCuentaOrigen
+          ? { id_cuenta_origen: paginationQuery.idCuentaOrigen }
+          : {}),
+        ...(searchTerm
+          ? {
+              OR: [
+                {
+                  codigo_validacion: {
+                    contains: searchTerm,
+                    mode: Prisma.QueryMode.insensitive,
+                  },
+                },
+                {
+                  detalles: {
+                    contains: searchTerm,
+                    mode: Prisma.QueryMode.insensitive,
+                  },
+                },
+                {
+                  Miembro: {
+                    OR: [
+                      {
+                        nombre: {
+                          contains: searchTerm,
+                          mode: Prisma.QueryMode.insensitive,
+                        },
+                      },
+                      {
+                        apellidos: {
+                          contains: searchTerm,
+                          mode: Prisma.QueryMode.insensitive,
+                        },
+                      },
+                      {
+                        dni: {
+                          contains: searchTerm,
+                          mode: Prisma.QueryMode.insensitive,
+                        },
+                      },
+                    ],
+                  },
+                },
+                {
+                  ConceptoPago: {
+                    nombre: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                },
+                {
+                  MetodoPago: {
+                    nombre: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                },
+                {
+                  CuentaDinero: {
+                    nombre: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                },
+                {
+                  CuentaOrigen: {
+                    nombre: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                },
+              ],
+            }
+          : {}),
       },
       this.scopeFilterService.forPagos(user),
     );
