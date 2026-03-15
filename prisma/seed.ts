@@ -181,6 +181,33 @@ const METODO_PAGO_DEFINITIONS = [
   },
 ] as const;
 
+const TIPO_EVENTO_DEFINITIONS = [
+  {
+    nombre: 'Campamento',
+    descripcion: 'Actividad de campamento con pernocte y logistica extendida.',
+  },
+  {
+    nombre: 'Salida Cercana',
+    descripcion: 'Actividad de salida breve y de cercania.',
+  },
+  {
+    nombre: 'RAID',
+    descripcion: 'Actividad de recorrido, desafio y progresion en territorio.',
+  },
+  {
+    nombre: 'Rally',
+    descripcion: 'Actividad ludica y competitiva por postas o estaciones.',
+  },
+  {
+    nombre: 'Acantonamiento',
+    descripcion: 'Actividad con pernocte en espacio cubierto o sede.',
+  },
+  {
+    nombre: 'Descubierta',
+    descripcion: 'Actividad de exploracion y reconocimiento del entorno.',
+  },
+] as const;
+
 const RELACION_DEFINITIONS = [
   { tipo: 'Madre', descripcion: 'Responsable con vínculo materno.' },
   { tipo: 'Padre', descripcion: 'Responsable con vínculo paterno.' },
@@ -234,6 +261,21 @@ const ADULT_CONSEJO_PERMISSIONS: RoleDefinition['permissions'][number] = {
   resources: [RESOURCE.CONSEJO],
 };
 
+const ADULT_EVENTO_PERMISSIONS: RoleDefinition['permissions'][number] = {
+  actions: CRUD_ACTIONS,
+  resources: [RESOURCE.EVENTO, RESOURCE.INSCRIPCION],
+};
+
+const ADULT_COMISION_PERMISSIONS: RoleDefinition['permissions'][number] = {
+  actions: CRUD_ACTIONS,
+  resources: [RESOURCE.COMISION, RESOURCE.PARTICIPANTE_COMISION],
+};
+
+const ADULT_TIPO_EVENTO_PERMISSIONS: RoleDefinition['permissions'][number] = {
+  actions: CRUD_ACTIONS,
+  resources: [RESOURCE.TIPO_EVENTO],
+};
+
 const ADULT_RESPONSABLE_PERMISSIONS: RoleDefinition['permissions'][number] = {
   actions: CRUD_ACTIONS,
   resources: [RESOURCE.RESPONSABLE],
@@ -280,6 +322,9 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
       ADULT_METODO_PAGO_PERMISSIONS,
       ADULT_CUENTA_DINERO_PERMISSIONS,
       ADULT_CONSEJO_PERMISSIONS,
+      ADULT_EVENTO_PERMISSIONS,
+      ADULT_COMISION_PERMISSIONS,
+      ADULT_TIPO_EVENTO_PERMISSIONS,
     ],
   },
   {
@@ -291,6 +336,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
         actions: CRUD_ACTIONS,
         resources: SECRETARIA_TESORERIA_RESOURCES,
       },
+      ADULT_COMISION_PERMISSIONS,
       {
         actions: [ACTION.READ],
         resources: ADULTO_READONLY_RESOURCES,
@@ -298,6 +344,9 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
       ADULT_CONCEPTO_PAGO_PERMISSIONS,
       ADULT_METODO_PAGO_PERMISSIONS,
       ADULT_CUENTA_DINERO_PERMISSIONS,
+      ADULT_EVENTO_PERMISSIONS,
+      ADULT_COMISION_PERMISSIONS,
+      ADULT_TIPO_EVENTO_PERMISSIONS,
     ],
   },
   {
@@ -311,6 +360,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
       ADULT_METODO_PAGO_PERMISSIONS,
       ADULT_CUENTA_DINERO_PERMISSIONS,
       ADULT_CONSEJO_PERMISSIONS,
+      ADULT_TIPO_EVENTO_PERMISSIONS,
     ],
   },
   {
@@ -324,6 +374,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
       ADULT_METODO_PAGO_PERMISSIONS,
       ADULT_CUENTA_DINERO_PERMISSIONS,
       ADULT_CONSEJO_PERMISSIONS,
+      ADULT_TIPO_EVENTO_PERMISSIONS,
     ],
   },
   {
@@ -335,6 +386,8 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
         actions: [ACTION.READ],
         resources: INTENDENCIA_READONLY_RESOURCES,
       },
+      ADULT_EVENTO_PERMISSIONS,
+      ADULT_COMISION_PERMISSIONS,
       ADULT_RESPONSABLE_PERMISSIONS,
       ADULT_RELACION_PERMISSIONS,
       ADULT_CONCEPTO_PAGO_PERMISSIONS,
@@ -603,6 +656,40 @@ async function seedMetodosPago(tx: Prisma.TransactionClient): Promise<void> {
       data: {
         nombre: metodoPago.nombre,
         descripcion: metodoPago.descripcion,
+      },
+    });
+  }
+}
+
+async function seedTiposEvento(tx: Prisma.TransactionClient): Promise<void> {
+  console.log('Creando tipos de evento base...');
+
+  for (const tipoEvento of TIPO_EVENTO_DEFINITIONS) {
+    const existing = await tx.tipoEvento.findFirst({
+      where: {
+        nombre: tipoEvento.nombre,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existing) {
+      await tx.tipoEvento.update({
+        where: { id: existing.id },
+        data: {
+          descripcion: tipoEvento.descripcion,
+          borrado: false,
+        },
+      });
+
+      continue;
+    }
+
+    await tx.tipoEvento.create({
+      data: {
+        nombre: tipoEvento.nombre,
+        descripcion: tipoEvento.descripcion,
       },
     });
   }
@@ -880,6 +967,7 @@ async function main() {
     await seedPosicionesArea(tx);
     await seedConceptosPago(tx);
     await seedMetodosPago(tx);
+    await seedTiposEvento(tx);
     await seedRelaciones(tx);
     await seedCuentasDineroBase(tx);
     await seedAdminAccount(tx, roleIdByName);

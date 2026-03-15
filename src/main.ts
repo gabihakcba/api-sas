@@ -3,6 +3,20 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
+function normalizeOrigin(value: string): string {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return '';
+  }
+
+  try {
+    return new URL(trimmedValue).origin.toLowerCase();
+  } catch {
+    return trimmedValue.replace(/\/+$/, '').toLowerCase();
+  }
+}
+
 function parseAllowedOrigins(value: string | undefined): string[] {
   if (!value) {
     return [];
@@ -10,7 +24,7 @@ function parseAllowedOrigins(value: string | undefined): string[] {
 
   return value
     .split(',')
-    .map((origin) => origin.trim())
+    .map((origin) => normalizeOrigin(origin))
     .filter((origin) => origin.length > 0);
 }
 
@@ -36,12 +50,20 @@ async function bootstrap() {
         return;
       }
 
-      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      const normalizedOrigin = normalizeOrigin(origin);
+
+      if (
+        allowedOrigins.length === 0 ||
+        allowedOrigins.includes(normalizedOrigin)
+      ) {
         callback(null, true);
         return;
       }
 
-      callback(new Error(`Origin no permitido por CORS: ${origin}`), false);
+      callback(
+        new Error(`Origin no permitido por CORS: ${normalizedOrigin}`),
+        false,
+      );
     },
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: [

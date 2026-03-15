@@ -1,13 +1,11 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
   ParseIntPipe,
-  Patch,
   Post,
   Query,
   Request,
@@ -23,7 +21,6 @@ import { AuthenticatedRequest } from '../auth/types/auth-request.types';
 import { CuentasDineroService } from './cuentas-dinero.service';
 import { CuentasDineroQueryDto } from './dto/cuentas-dinero-query.dto';
 import { CreateCuentaDineroDto } from './dto/create-cuenta-dinero.dto';
-import { UpdateCuentaDineroDto } from './dto/update-cuenta-dinero.dto';
 
 @Controller('cuentas-dinero')
 export class CuentasDineroController {
@@ -69,31 +66,5 @@ export class CuentasDineroController {
     @Body() dto: CreateCuentaDineroDto,
   ) {
     return this.cuentasDineroService.create(dto, req.user!);
-  }
-
-  @Patch(':id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard, ScopesGuard)
-  @CheckPermissions('UPDATE:CUENTA_DINERO')
-  @ScopeAccess(
-    { scopeType: SCOPE.AREA, entity: 'AREA', field: 'idArea', optional: true },
-    { scopeType: SCOPE.RAMA, entity: 'RAMA', field: 'idRama', optional: true },
-  )
-  async update(
-    @Request() req: AuthenticatedRequest,
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateCuentaDineroDto,
-  ) {
-    return this.cuentasDineroService.update(id, dto, req.user!);
-  }
-
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @CheckPermissions('DELETE:CUENTA_DINERO')
-  async remove(
-    @Request() req: AuthenticatedRequest,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
-    await this.cuentasDineroService.remove(id, req.user!);
   }
 }

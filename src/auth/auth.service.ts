@@ -193,6 +193,7 @@ export class AuthService {
       permissionsSet.add(`${ACTION.READ}:${RESOURCE.CUENTA_DINERO}`);
       permissionsSet.add(`${ACTION.READ}:${RESOURCE.PAGO}`);
       permissionsSet.add(`${ACTION.READ}:${RESOURCE.CONSEJO}`);
+      permissionsSet.add(`${ACTION.READ}:${RESOURCE.EVENTO}`);
     }
   }
 
