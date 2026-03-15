@@ -36,10 +36,31 @@ export class AuthService {
   ) {}
 
   async validateUser(loginDto: LoginDto): Promise<UserPayload> {
-    const { user: username, password } = loginDto;
+    const { user, password } = loginDto;
+    const identifier = user.trim();
 
     const account = await this.prisma.cuenta.findFirst({
-      where: { user: username, borrado: false },
+      where: {
+        borrado: false,
+        OR: [
+          { user: identifier },
+          {
+            Miembro: {
+              borrado: false,
+              dni: identifier,
+            },
+          },
+          {
+            Miembro: {
+              borrado: false,
+              email: {
+                equals: identifier,
+                mode: 'insensitive',
+              },
+            },
+          },
+        ],
+      },
       select: {
         id: true,
         user: true,
