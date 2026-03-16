@@ -14,6 +14,7 @@ export interface RoleScope {
 export interface UserPayload {
   id: number;
   user: string;
+  memberId: number | null;
   roles: string[];
   permissions: string[];
   scopes: RoleScope[];
@@ -67,6 +68,7 @@ export class AuthService {
         password: true,
         Miembro: {
           select: {
+            id: true,
             Protagonista: {
               select: {
                 id: true,
@@ -147,6 +149,7 @@ export class AuthService {
     return {
       id: account.id,
       user: account.user,
+      memberId: account.Miembro?.id ?? null,
       roles,
       permissions: Array.from(permissionsSet),
       scopes,
@@ -222,6 +225,7 @@ export class AuthService {
     const payload = {
       username: user.user,
       sub: user.id,
+      memberId: user.memberId,
       roles: user.roles,
       permissions: user.permissions,
       scopes: user.scopes,
@@ -232,6 +236,7 @@ export class AuthService {
       user: {
         id: user.id,
         user: user.user,
+        memberId: user.memberId,
         roles: user.roles,
         permissions: user.permissions,
         scopes: user.scopes,

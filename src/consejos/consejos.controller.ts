@@ -27,6 +27,7 @@ import { CreateTemarioConsejoDto } from './dto/create-temario-consejo.dto';
 import { UpdateTemarioConsejoDto } from './dto/update-temario-consejo.dto';
 import { ConsejoAsistenciaOptionsQueryDto } from './dto/consejo-asistencia-options-query.dto';
 import { CreateAsistenciaConsejoDto } from './dto/create-asistencia-consejo.dto';
+import { UpdateConsejoModeradorDto } from './dto/update-consejo-moderador.dto';
 
 @Controller('consejos')
 export class ConsejosController {
@@ -151,6 +152,16 @@ export class ConsejosController {
     @Body() dto: UpdateConsejoDto,
   ) {
     return this.consejosService.update(id, dto);
+  }
+
+  @Patch(':id/moderador')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('UPDATE:CONSEJO')
+  async updateModerador(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateConsejoModeradorDto,
+  ) {
+    return this.consejosService.updateModerador(id, dto);
   }
 
   @Patch(':id/temario/:temarioId')

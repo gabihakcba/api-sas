@@ -10,6 +10,7 @@ export interface AuthenticatedScope {
 export interface AuthenticatedUser {
   userId: number;
   username: string;
+  memberId: number | null;
   roles: string[];
   permissions: string[];
   scopes: AuthenticatedScope[];

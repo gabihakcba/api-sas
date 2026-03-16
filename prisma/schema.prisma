@@ -72,6 +72,7 @@ model Miembro {
   PagoResponsable       Pago[]                  @relation(name: "PagoResponsable")
   AsistenciaConsejo     AsistenciaConsejo[]     @relation(name: "AsistenciaMiembro")
   CuentaDinero          CuentaDinero[]          @relation(name: "CuentaMiembro")
+  ConsejoModerado       Consejo[]               @relation(name: "ConsejoModerador")
 }
 
 model Protagonista {
@@ -568,10 +569,14 @@ model Consejo {
   es_ordinario Boolean   @default(true)
   hora_inicio  DateTime?
   hora_fin     DateTime?
+  id_moderador Int?
 
   borrado   Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Foreign key relations
+  Moderador Miembro? @relation(fields: [id_moderador], references: [id], name: "ConsejoModerador")
 
   // Relations
   AsistenciaConsejo AsistenciaConsejo[] @relation(name: "AsistenciaConsejoConsejo")

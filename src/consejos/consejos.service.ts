@@ -15,6 +15,7 @@ import { CreateTemarioConsejoDto } from './dto/create-temario-consejo.dto';
 import { UpdateTemarioConsejoDto } from './dto/update-temario-consejo.dto';
 import { ConsejoAsistenciaOptionsQueryDto } from './dto/consejo-asistencia-options-query.dto';
 import { CreateAsistenciaConsejoDto } from './dto/create-asistencia-consejo.dto';
+import { UpdateConsejoModeradorDto } from './dto/update-consejo-moderador.dto';
 
 type AttendanceMember = {
   id: number;
@@ -44,6 +45,12 @@ type ConsejoExportData = {
   es_ordinario: boolean;
   hora_inicio: Date | null;
   hora_fin: Date | null;
+  Moderador: {
+    id: number;
+    nombre: string;
+    apellidos: string;
+    dni: string;
+  } | null;
   AsistenciaConsejo: Array<{
     id: number;
     descripcion: string;
@@ -377,6 +384,43 @@ export class ConsejosService {
     });
   }
 
+  async updateModerador(id: number, dto: UpdateConsejoModeradorDto) {
+    await this.ensureExists(id);
+
+    if (dto.idModerador !== null) {
+      const miembro = await this.prisma.miembro.findFirst({
+        where: {
+          id: dto.idModerador,
+          borrado: false,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!miembro) {
+        throw new NotFoundException('El moderador indicado no existe.');
+      }
+    }
+
+    return this.prisma.consejo.update({
+      where: { id },
+      data: {
+        Moderador:
+          dto.idModerador === null
+            ? {
+                disconnect: true,
+              }
+            : {
+                connect: {
+                  id: dto.idModerador,
+                },
+              },
+      },
+      select: this.buildConsejoSelect(),
+    });
+  }
+
   async remove(id: number) {
     await this.ensureExists(id);
 
@@ -440,13 +484,21 @@ export class ConsejosService {
       es_ordinario: true,
       hora_inicio: true,
       hora_fin: true,
+      Moderador: {
+        select: {
+          id: true,
+          nombre: true,
+          apellidos: true,
+          dni: true,
+        },
+      },
       TemarioConsejo: {
         where: {
           borrado: false,
           ...(shouldHidePrivateTemario ? { sin_mp: false } : {}),
         },
         orderBy: {
-          id: 'asc',
+          id: Prisma.SortOrder.asc,
         },
         select: {
           ...this.temarioSelect(),
@@ -467,7 +519,7 @@ export class ConsejosService {
           },
         },
       },
-    } satisfies Prisma.ConsejoSelect;
+    };
   }
 
   private temarioSelect() {
@@ -731,6 +783,14 @@ export class ConsejosService {
         es_ordinario: true,
         hora_inicio: true,
         hora_fin: true,
+        Moderador: {
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+            dni: true,
+          },
+        },
         AsistenciaConsejo: {
           where: {
             borrado: false,
@@ -749,7 +809,7 @@ export class ConsejosService {
             ...(includePrivateTopics ? {} : { sin_mp: false }),
           },
           orderBy: {
-            id: 'asc',
+            id: Prisma.SortOrder.asc,
           },
           select: {
             id: true,

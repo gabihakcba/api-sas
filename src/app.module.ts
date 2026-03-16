@@ -17,6 +17,7 @@ import { PerfilesModule } from './perfiles/perfiles.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProtagonistasModule } from './protagonistas/protagonistas.module';
 import { RamasModule } from './ramas/ramas.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { RelacionesModule } from './relaciones/relaciones.module';
 import { ResponsablesModule } from './responsables/responsables.module';
 import { TiposEventoModule } from './tipos-evento/tipos-evento.module';
@@ -41,6 +42,7 @@ import { TiposEventoModule } from './tipos-evento/tipos-evento.module';
     ProtagonistasModule,
     AdultosModule,
     RamasModule,
+    RealtimeModule,
     RelacionesModule,
     ResponsablesModule,
     TiposEventoModule,
