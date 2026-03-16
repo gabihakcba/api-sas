@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 
 function normalizeOrigin(value: string): string {
@@ -31,6 +32,10 @@ function parseAllowedOrigins(value: string | undefined): string[] {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
+  const bodySizeLimit = process.env.BODY_SIZE_LIMIT?.trim() || '15mb';
+
+  app.use(json({ limit: bodySizeLimit }));
+  app.use(urlencoded({ extended: true, limit: bodySizeLimit }));
 
   app.useGlobalPipes(
     new ValidationPipe({
