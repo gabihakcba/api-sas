@@ -18,4 +18,14 @@ export interface ConsejoRealtimeState {
   moderatorMemberId: number | null;
 }
 
+export interface ConsejoRealtimeTemarioUpdate {
+  id: number;
+  titulo: string;
+  descripcion: string | null;
+  debate: string | null;
+  acuerdo: string | null;
+  sin_mp: boolean;
+  estado: string;
+}
+
 export interface RealtimeSocketUser extends AuthenticatedUser {}

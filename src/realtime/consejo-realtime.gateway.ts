@@ -150,6 +150,28 @@ export class ConsejoRealtimeGateway
     await this.emitState(consejoId);
   }
 
+  @SubscribeMessage('consejo:temario:sync')
+  async handleSyncTemario(
+    @ConnectedSocket() client: SocketWithAuth,
+    @MessageBody()
+    body: {
+      temarioId: number;
+      debate: string;
+      acuerdo: string;
+      estado: string;
+    },
+  ) {
+    const consejoId = client.data.consejoId!;
+    const updatedTemario = await this.consejoRealtimeService.syncTemario(
+      consejoId,
+      client.data.user?.memberId ?? null,
+      body,
+    );
+    this.server
+      .to(this.roomName(consejoId))
+      .emit('consejo:temario:updated', updatedTemario);
+  }
+
   async emitState(consejoId: number) {
     const state = await this.consejoRealtimeService.getState(consejoId);
     this.server.to(this.roomName(consejoId)).emit('consejo:state', state);

@@ -8,6 +8,7 @@ import {
   ConsejoRealtimeHand,
   ConsejoRealtimeSpeaker,
   ConsejoRealtimeState,
+  ConsejoRealtimeTemarioUpdate,
 } from './realtime.types';
 
 type ConsejoRealtimeMemoryState = {
@@ -149,6 +150,114 @@ export class ConsejoRealtimeService {
       .filter((speaker): speaker is ConsejoRealtimeSpeaker => !!speaker);
 
     return this.buildStateFromContext(consejo, state);
+  }
+
+  async syncTemario(
+    idConsejo: number,
+    actorMemberId: number | null,
+    payload: {
+      temarioId: number;
+      debate: string;
+      acuerdo: string;
+      estado: string;
+    },
+  ): Promise<ConsejoRealtimeTemarioUpdate> {
+    if (!actorMemberId) {
+      throw new ForbiddenException('Tu cuenta no tiene un miembro vinculado.');
+    }
+
+    const temario = await this.prisma.temarioConsejo.findFirst({
+      where: {
+        id: payload.temarioId,
+        id_consejo: idConsejo,
+        borrado: false,
+      },
+      select: {
+        id: true,
+        debate: true,
+        acuerdo: true,
+      },
+    });
+
+    if (!temario) {
+      throw new NotFoundException('El tema indicado no existe en este consejo.');
+    }
+
+    const adultMember = await this.prisma.miembro.findFirst({
+      where: {
+        id: actorMemberId,
+        borrado: false,
+        Adulto: {
+          is: {
+            borrado: false,
+            activo: true,
+          },
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!adultMember) {
+      throw new ForbiddenException(
+        'Solo adultos pueden editar el temario del consejo.',
+      );
+    }
+
+    const consejo = await this.prisma.consejo.findFirst({
+      where: {
+        id: idConsejo,
+        borrado: false,
+      },
+      select: {
+        id_secretario: true,
+        id_prosecretario: true,
+      },
+    });
+
+    if (!consejo) {
+      throw new NotFoundException('El consejo indicado no existe.');
+    }
+
+    const canEditActa =
+      consejo.id_secretario === actorMemberId ||
+      consejo.id_prosecretario === actorMemberId;
+
+    if (
+      !canEditActa &&
+      ((payload.debate ?? '') !== (temario.debate ?? '') ||
+        (payload.acuerdo ?? '') !== (temario.acuerdo ?? ''))
+    ) {
+      throw new ForbiddenException(
+        'Solo el secretario o prosecretario pueden editar debate y acuerdo.',
+      );
+    }
+
+    const updated = await this.prisma.temarioConsejo.update({
+      where: {
+        id: temario.id,
+      },
+      data: {
+        debate: payload.debate,
+        acuerdo: payload.acuerdo,
+        estado: payload.estado as never,
+      },
+      select: {
+        id: true,
+        titulo: true,
+        descripcion: true,
+        debate: true,
+        acuerdo: true,
+        sin_mp: true,
+        estado: true,
+      },
+    });
+
+    return {
+      ...updated,
+      estado: String(updated.estado),
+    };
   }
 
   clearState(idConsejo: number) {

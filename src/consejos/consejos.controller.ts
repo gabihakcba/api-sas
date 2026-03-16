@@ -28,6 +28,7 @@ import { UpdateTemarioConsejoDto } from './dto/update-temario-consejo.dto';
 import { ConsejoAsistenciaOptionsQueryDto } from './dto/consejo-asistencia-options-query.dto';
 import { CreateAsistenciaConsejoDto } from './dto/create-asistencia-consejo.dto';
 import { UpdateConsejoModeradorDto } from './dto/update-consejo-moderador.dto';
+import { UpdateConsejoSecretariaDto } from './dto/update-consejo-secretaria.dto';
 
 @Controller('consejos')
 export class ConsejosController {
@@ -124,13 +125,13 @@ export class ConsejosController {
 
   @Post(':id/temario')
   @HttpCode(HttpStatus.CREATED)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @CheckPermissions('UPDATE:CONSEJO')
+  @UseGuards(JwtAuthGuard)
   async createTemario(
+    @Request() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreateTemarioConsejoDto,
   ) {
-    return this.consejosService.createTemario(id, dto);
+    return this.consejosService.createTemario(id, dto, req.user!);
   }
 
   @Post(':id/asistencias')
@@ -164,15 +165,25 @@ export class ConsejosController {
     return this.consejosService.updateModerador(id, dto);
   }
 
+  @Patch(':id/secretaria')
+  @UseGuards(JwtAuthGuard)
+  async updateSecretaria(
+    @Request() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateConsejoSecretariaDto,
+  ) {
+    return this.consejosService.updateSecretaria(id, dto, req.user!);
+  }
+
   @Patch(':id/temario/:temarioId')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @CheckPermissions('UPDATE:CONSEJO')
+  @UseGuards(JwtAuthGuard)
   async updateTemario(
+    @Request() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
     @Param('temarioId', ParseIntPipe) temarioId: number,
     @Body() dto: UpdateTemarioConsejoDto,
   ) {
-    return this.consejosService.updateTemario(id, temarioId, dto);
+    return this.consejosService.updateTemario(id, temarioId, dto, req.user!);
   }
 
   @Delete(':id')
@@ -185,12 +196,12 @@ export class ConsejosController {
 
   @Delete(':id/temario/:temarioId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @CheckPermissions('UPDATE:CONSEJO')
+  @UseGuards(JwtAuthGuard)
   async removeTemario(
+    @Request() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
     @Param('temarioId', ParseIntPipe) temarioId: number,
   ) {
-    await this.consejosService.removeTemario(id, temarioId);
+    await this.consejosService.removeTemario(id, temarioId, req.user!);
   }
 }

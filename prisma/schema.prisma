@@ -73,6 +73,8 @@ model Miembro {
   AsistenciaConsejo     AsistenciaConsejo[]     @relation(name: "AsistenciaMiembro")
   CuentaDinero          CuentaDinero[]          @relation(name: "CuentaMiembro")
   ConsejoModerado       Consejo[]               @relation(name: "ConsejoModerador")
+  ConsejoSecretariado   Consejo[]               @relation(name: "ConsejoSecretario")
+  ConsejoProsecretaria  Consejo[]               @relation(name: "ConsejoProsecretario")
 }
 
 model Protagonista {
@@ -570,6 +572,8 @@ model Consejo {
   hora_inicio  DateTime?
   hora_fin     DateTime?
   id_moderador Int?
+  id_secretario Int?
+  id_prosecretario Int?
 
   borrado   Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -577,6 +581,8 @@ model Consejo {
 
   // Foreign key relations
   Moderador Miembro? @relation(fields: [id_moderador], references: [id], name: "ConsejoModerador")
+  Secretario Miembro? @relation(fields: [id_secretario], references: [id], name: "ConsejoSecretario")
+  Prosecretario Miembro? @relation(fields: [id_prosecretario], references: [id], name: "ConsejoProsecretario")
 
   // Relations
   AsistenciaConsejo AsistenciaConsejo[] @relation(name: "AsistenciaConsejoConsejo")

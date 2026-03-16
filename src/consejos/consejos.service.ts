@@ -16,6 +16,7 @@ import { UpdateTemarioConsejoDto } from './dto/update-temario-consejo.dto';
 import { ConsejoAsistenciaOptionsQueryDto } from './dto/consejo-asistencia-options-query.dto';
 import { CreateAsistenciaConsejoDto } from './dto/create-asistencia-consejo.dto';
 import { UpdateConsejoModeradorDto } from './dto/update-consejo-moderador.dto';
+import { UpdateConsejoSecretariaDto } from './dto/update-consejo-secretaria.dto';
 
 type AttendanceMember = {
   id: number;
@@ -46,6 +47,18 @@ type ConsejoExportData = {
   hora_inicio: Date | null;
   hora_fin: Date | null;
   Moderador: {
+    id: number;
+    nombre: string;
+    apellidos: string;
+    dni: string;
+  } | null;
+  Secretario: {
+    id: number;
+    nombre: string;
+    apellidos: string;
+    dni: string;
+  } | null;
+  Prosecretario: {
     id: number;
     nombre: string;
     apellidos: string;
@@ -290,8 +303,13 @@ export class ConsejosService {
     });
   }
 
-  async createTemario(idConsejo: number, dto: CreateTemarioConsejoDto) {
+  async createTemario(
+    idConsejo: number,
+    dto: CreateTemarioConsejoDto,
+    user: AuthenticatedUser,
+  ) {
     await this.ensureExists(idConsejo);
+    await this.ensureAdultMember(user.memberId);
     const data = this.normalizeTemarioCreatePayload(dto);
 
     return this.prisma.temarioConsejo.create({
@@ -421,6 +439,38 @@ export class ConsejosService {
     });
   }
 
+  async updateSecretaria(
+    id: number,
+    dto: UpdateConsejoSecretariaDto,
+    user: AuthenticatedUser,
+  ) {
+    await this.ensureExists(id);
+    await this.ensureAdultMember(user.memberId);
+
+    if (dto.idSecretario !== null) {
+      await this.ensureAdultMember(dto.idSecretario);
+    }
+
+    if (dto.idProsecretario !== null) {
+      await this.ensureAdultMember(dto.idProsecretario);
+    }
+
+    return this.prisma.consejo.update({
+      where: { id },
+      data: {
+        Secretario:
+          dto.idSecretario === null
+            ? { disconnect: true }
+            : { connect: { id: dto.idSecretario } },
+        Prosecretario:
+          dto.idProsecretario === null
+            ? { disconnect: true }
+            : { connect: { id: dto.idProsecretario } },
+      },
+      select: this.buildConsejoSelect(),
+    });
+  }
+
   async remove(id: number) {
     await this.ensureExists(id);
 
@@ -436,9 +486,12 @@ export class ConsejosService {
     idConsejo: number,
     temarioId: number,
     dto: UpdateTemarioConsejoDto,
+    user: AuthenticatedUser,
   ) {
     await this.ensureExists(idConsejo);
     await this.ensureTemarioExists(idConsejo, temarioId);
+    await this.ensureAdultMember(user.memberId);
+    await this.ensureTemarioRestrictedFieldsAccess(idConsejo, user.memberId, dto);
     const data = this.normalizeTemarioUpdatePayload(dto);
 
     return this.prisma.temarioConsejo.update({
@@ -459,9 +512,14 @@ export class ConsejosService {
     });
   }
 
-  async removeTemario(idConsejo: number, temarioId: number) {
+  async removeTemario(
+    idConsejo: number,
+    temarioId: number,
+    user: AuthenticatedUser,
+  ) {
     await this.ensureExists(idConsejo);
     await this.ensureTemarioExists(idConsejo, temarioId);
+    await this.ensureAdultMember(user.memberId);
 
     await this.prisma.temarioConsejo.update({
       where: {
@@ -485,6 +543,22 @@ export class ConsejosService {
       hora_inicio: true,
       hora_fin: true,
       Moderador: {
+        select: {
+          id: true,
+          nombre: true,
+          apellidos: true,
+          dni: true,
+        },
+      },
+      Secretario: {
+        select: {
+          id: true,
+          nombre: true,
+          apellidos: true,
+          dni: true,
+        },
+      },
+      Prosecretario: {
         select: {
           id: true,
           nombre: true,
@@ -575,6 +649,80 @@ export class ConsejosService {
         },
       },
     } satisfies Prisma.MiembroSelect;
+  }
+
+  private async ensureAdultMember(memberId: number | null) {
+    if (!memberId) {
+      throw new BadRequestException('El miembro indicado no es válido.');
+    }
+
+    const member = await this.prisma.miembro.findFirst({
+      where: {
+        id: memberId,
+        borrado: false,
+        Adulto: {
+          is: {
+            borrado: false,
+            activo: true,
+          },
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!member) {
+      throw new BadRequestException('El miembro debe ser un adulto activo.');
+    }
+  }
+
+  private async ensureSecretariaEditor(
+    idConsejo: number,
+    memberId: number | null,
+  ) {
+    if (!memberId) {
+      throw new BadRequestException('Tu cuenta no tiene un miembro vinculado.');
+    }
+
+    const consejo = await this.prisma.consejo.findFirst({
+      where: {
+        id: idConsejo,
+        borrado: false,
+      },
+      select: {
+        id_secretario: true,
+        id_prosecretario: true,
+      },
+    });
+
+    if (!consejo) {
+      throw new NotFoundException('El consejo indicado no existe.');
+    }
+
+    if (
+      consejo.id_secretario !== memberId &&
+      consejo.id_prosecretario !== memberId
+    ) {
+      throw new BadRequestException(
+        'Solo el secretario o prosecretario pueden editar el temario.',
+      );
+    }
+  }
+
+  private async ensureTemarioRestrictedFieldsAccess(
+    idConsejo: number,
+    memberId: number | null,
+    dto: UpdateTemarioConsejoDto,
+  ) {
+    const wantsRestrictedUpdate =
+      dto.debate !== undefined || dto.acuerdo !== undefined;
+
+    if (!wantsRestrictedUpdate) {
+      return;
+    }
+
+    await this.ensureSecretariaEditor(idConsejo, memberId);
   }
 
   private normalizeCreatePayload(dto: CreateConsejoDto) {
@@ -784,6 +932,22 @@ export class ConsejosService {
         hora_inicio: true,
         hora_fin: true,
         Moderador: {
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+            dni: true,
+          },
+        },
+        Secretario: {
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+            dni: true,
+          },
+        },
+        Prosecretario: {
           select: {
             id: true,
             nombre: true,
