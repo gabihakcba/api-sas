@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ComisionesModule } from './comisiones/comisiones.module';
+import { CalendarioModule } from './calendario/calendario.module';
 import { ConsejosModule } from './consejos/consejos.module';
 import { ConceptosPagoModule } from './conceptos-pago/conceptos-pago.module';
 import { CuentasModule } from './cuentas/cuentas.module';
@@ -26,6 +27,7 @@ import { TiposEventoModule } from './tipos-evento/tipos-evento.module';
       isGlobal: true,
     }),
     PrismaModule,
+    CalendarioModule,
     AuthModule,
     ComisionesModule,
     ConsejosModule,

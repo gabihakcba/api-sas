@@ -19,6 +19,7 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AssignEventoComisionDto } from './dto/assign-evento-comision.dto';
+import { CalendarEventosQueryDto } from './dto/calendar-eventos-query.dto';
 import { CreateEventoDto } from './dto/create-evento.dto';
 import { UpdateEventoAfectacionesDto } from './dto/update-evento-afectaciones.dto';
 import { UpdateEventoInscripcionesDto } from './dto/update-evento-inscripciones.dto';
@@ -49,6 +50,13 @@ export class EventosController {
   @CheckPermissions('READ:EVENTO')
   async getOptions() {
     return this.eventosService.getOptions();
+  }
+
+  @Get('calendar')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('READ:EVENTO')
+  async getCalendarEvents(@Query() query: CalendarEventosQueryDto) {
+    return this.eventosService.getCalendarEvents(query);
   }
 
   @Get(':id')

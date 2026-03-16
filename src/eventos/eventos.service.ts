@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssignEventoComisionDto } from './dto/assign-evento-comision.dto';
+import { CalendarEventosQueryDto } from './dto/calendar-eventos-query.dto';
 import { CreateEventoDto } from './dto/create-evento.dto';
 import { UpdateEventoAfectacionesDto } from './dto/update-evento-afectaciones.dto';
 import { UpdateEventoInscripcionesDto } from './dto/update-evento-inscripciones.dto';
@@ -81,6 +82,94 @@ export class EventosService {
     ]);
 
     return { tipos, areas, ramas, miembros, comisiones };
+  }
+
+  async getCalendarEvents(query: CalendarEventosQueryDto) {
+    const from = new Date(query.from);
+    const to = new Date(query.to);
+
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      throw new BadRequestException(
+        'Debes indicar un rango de fechas válido para el calendario.',
+      );
+    }
+
+    if (to < from) {
+      throw new BadRequestException(
+        'La fecha final del calendario no puede ser anterior a la inicial.',
+      );
+    }
+
+    return this.prisma.evento.findMany({
+      where: {
+        borrado: false,
+        fecha_inicio: {
+          lte: to,
+        },
+        fecha_fin: {
+          gte: from,
+        },
+        ...(query.idTipo !== undefined ? { id_tipo: query.idTipo } : {}),
+        ...(query.idArea !== undefined
+          ? {
+              AreaAfectada: {
+                some: {
+                  id_area: query.idArea,
+                },
+              },
+            }
+          : {}),
+        ...(query.idRama !== undefined
+          ? {
+              RamaAfectada: {
+                some: {
+                  id_rama: query.idRama,
+                  borrado: false,
+                },
+              },
+            }
+          : {}),
+      },
+      orderBy: [{ fecha_inicio: 'asc' }, { nombre: 'asc' }],
+      select: {
+        id: true,
+        nombre: true,
+        descripcion: true,
+        fecha_inicio: true,
+        fecha_fin: true,
+        lugar: true,
+        terminado: true,
+        TipoEvento: {
+          select: {
+            id: true,
+            nombre: true,
+          },
+        },
+        AreaAfectada: {
+          select: {
+            Area: {
+              select: {
+                id: true,
+                nombre: true,
+              },
+            },
+          },
+        },
+        RamaAfectada: {
+          where: {
+            borrado: false,
+          },
+          select: {
+            Rama: {
+              select: {
+                id: true,
+                nombre: true,
+              },
+            },
+          },
+        },
+      },
+    });
   }
 
   async findOne(id: number) {
