@@ -112,9 +112,11 @@ model Adulto {
   Miembro Miembro @relation(fields: [id_miembro], references: [id], name: "MiembroAdulto")
 
   // Relations
-  EquipoArea       EquipoArea[]       @relation(name: "EquipoAreaAdulto")
-  FormacionAdultos FormacionAdultos[] @relation(name: "FormacionAdultosAdulto")
-  Certificado      Certificado[]      @relation(name: "CertificadoAdulto")
+  EquipoArea           EquipoArea[]               @relation(name: "EquipoAreaAdulto")
+  PlanDesempenoAdulto  PlanDesempenoAdulto[]      @relation(name: "PlanDesempenoAdultoAdulto")
+  PlanDesempenoComoAPF PlanDesempenoAdulto[]      @relation(name: "PlanDesempenoAdultoAPF")
+  CompetenciaValidada  PlanDesempenoCompetencia[] @relation(name: "PlanDesempenoCompetenciaValidador")
+  AsignacionesAPF      AsignacionAPF[]            @relation(name: "AsignacionAPFAdulto")
 }
 
 model Responsable {
@@ -183,11 +185,11 @@ model Area {
   updatedAt DateTime @updatedAt
 
   // Relations
-  EquipoArea    EquipoArea[]    @relation(name: "EquipoAreaArea")
-  AreaAfectada  AreaAfectada[]  @relation(name: "AreaAfectadaArea")
-  CuentaDinero  CuentaDinero[]  @relation(name: "CuentaArea")
-  PlanFormacion PlanFormacion[] @relation(name: "PlanFormacionArea")
-  Rama          Rama[]          @relation(name: "RamaArea")
+  EquipoArea            EquipoArea[]            @relation(name: "EquipoAreaArea")
+  AreaAfectada          AreaAfectada[]          @relation(name: "AreaAfectadaArea")
+  CuentaDinero          CuentaDinero[]          @relation(name: "CuentaArea")
+  PlanFormacionTemplate PlanFormacionTemplate[] @relation(name: "PlanFormacionTemplateArea")
+  Rama                  Rama[]                  @relation(name: "RamaArea")
 }
 
 model EquipoArea {
@@ -410,14 +412,14 @@ model InscripcionEvento {
 // @CuentaDinero
 //
 model Pago {
-  id                Int      @id @default(autoincrement())
-  monto             Decimal  @db.Decimal(15, 2)
-  detalles          String?
-  comprobante_pago  Bytes?
-  comprobante_pago_mime String?
+  id                      Int      @id @default(autoincrement())
+  monto                   Decimal  @db.Decimal(15, 2)
+  detalles                String?
+  comprobante_pago        Bytes?
+  comprobante_pago_mime   String?
   comprobante_pago_nombre String?
-  fecha_pago        DateTime @default(now())
-  codigo_validacion String   @unique @default(uuid())
+  fecha_pago              DateTime @default(now())
+  codigo_validacion       String   @unique @default(uuid())
 
   borrado   Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -494,16 +496,35 @@ model CuentaDinero {
 }
 
 //
-// Tablas para formaciones de adultos
-// @PlanFormacion
-// @FormacionAdultos
-// @Certificado
+// Tablas para formacion de adultos
+// @PlanFormacionTemplate
+// @PlanFormacionNivelTemplate
+// @PlanFormacionCompetenciaTemplate
+// @PlanFormacionComportamientoTemplate
+// @PlanFormacionAprendizajeTemplate
+// @PlanFormacionResultadoTemplate
+// @AdjuntoFormacionTemplate
+// @PlanDesempenoAdulto
+// @PlanDesempenoCompetencia
+// @PlanDesempenoCertificado
 //
-model PlanFormacion {
+enum TIPO_COMPETENCIA_FORMACION {
+  ESENCIAL
+  ESPECIFICA
+}
+
+enum ESTADO_PLAN_DESEMPENO {
+  BORRADOR
+  EN_CURSO
+  FINALIZADO
+  APROBADO
+}
+
+model PlanFormacionTemplate {
   id          Int     @id @default(autoincrement())
-  titulo      String
+  nombre      String  @unique
   descripcion String?
-  nivel       Int? // 1 - 2 - 3
+  activo      Boolean @default(true)
 
   borrado   Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -513,48 +534,211 @@ model PlanFormacion {
   id_area Int
 
   // Foreign key relations
-  Area             Area               @relation(fields: [id_area], references: [id], name: "PlanFormacionArea")
-  FormacionAdultos FormacionAdultos[] @relation(name: "FormacionAdultosPlanFormacion")
-}
-
-model FormacionAdultos {
-  id          Int     @id @default(autoincrement())
-  descripcion String?
-  estado      String? // En curso - pendiente - terminado
-
-  borrado   Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Foreign keys
-  id_adulto         Int
-  id_plan_formacion Int
-  id_certificado    Int
-
-  // Foreign key relations
-  Adulto        Adulto        @relation(fields: [id_adulto], references: [id], name: "FormacionAdultosAdulto")
-  PlanFormacion PlanFormacion @relation(fields: [id_plan_formacion], references: [id], name: "FormacionAdultosPlanFormacion")
-  Certificado   Certificado   @relation(fields: [id_certificado], references: [id], name: "FormacionAdultosCertificado")
-}
-
-model Certificado {
-  id          Int     @id @default(autoincrement())
-  titulo      String
-  descripcion String?
-  url         String?
-
-  borrado   Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Foreign keys
-  id_adulto Int
-
-  // Foreign key relations
-  Adulto Adulto @relation(fields: [id_adulto], references: [id], name: "CertificadoAdulto")
+  Area Area @relation(fields: [id_area], references: [id], name: "PlanFormacionTemplateArea")
 
   // Relations
-  FormacionAdultos FormacionAdultos[] @relation(name: "FormacionAdultosCertificado")
+  Niveles         PlanFormacionNivelTemplate[] @relation(name: "PlanFormacionNivelTemplatePlan")
+  Adjuntos        AdjuntoFormacionTemplate[]   @relation(name: "AdjuntoFormacionTemplatePlan")
+  PlanesDesempeno PlanDesempenoAdulto[]        @relation(name: "PlanDesempenoAdultoPlan")
+}
+
+model PlanFormacionNivelTemplate {
+  id          Int     @id @default(autoincrement())
+  orden       Int
+  nombre      String // Nivel 1 - Etapa Basica, etc.
+  descripcion String?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_plan_formacion_template Int
+
+  // Foreign key relations
+  PlanFormacionTemplate PlanFormacionTemplate @relation(fields: [id_plan_formacion_template], references: [id], name: "PlanFormacionNivelTemplatePlan")
+
+  // Relations
+  Competencias PlanFormacionCompetenciaTemplate[] @relation(name: "PlanFormacionCompetenciaTemplateNivel")
+  Certificados PlanDesempenoCertificado[]         @relation(name: "PlanDesempenoCertificadoNivel")
+
+  @@unique([id_plan_formacion_template, orden])
+}
+
+model PlanFormacionCompetenciaTemplate {
+  id          Int                        @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+  tipo        TIPO_COMPETENCIA_FORMACION
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_nivel_template Int
+
+  // Foreign key relations
+  Nivel PlanFormacionNivelTemplate @relation(fields: [id_nivel_template], references: [id], name: "PlanFormacionCompetenciaTemplateNivel")
+
+  // Relations
+  Comportamientos     PlanFormacionComportamientoTemplate[] @relation(name: "PlanFormacionComportamientoTemplateCompetencia")
+  Aprendizajes        PlanFormacionAprendizajeTemplate[]    @relation(name: "PlanFormacionAprendizajeTemplateCompetencia")
+  ResultadosEsperados PlanFormacionResultadoTemplate[]      @relation(name: "PlanFormacionResultadoTemplateCompetencia")
+  CompetenciasAdulto  PlanDesempenoCompetencia[]            @relation(name: "PlanDesempenoCompetenciaTemplate")
+  Certificados        PlanDesempenoCertificado[]            @relation(name: "PlanDesempenoCertificadoCompetencia")
+}
+
+model PlanFormacionComportamientoTemplate {
+  id          Int    @id @default(autoincrement())
+  descripcion String
+  orden       Int
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_competencia_template Int
+
+  // Foreign key relations
+  Competencia PlanFormacionCompetenciaTemplate @relation(fields: [id_competencia_template], references: [id], name: "PlanFormacionComportamientoTemplateCompetencia")
+
+  @@unique([id_competencia_template, orden])
+}
+
+model PlanFormacionAprendizajeTemplate {
+  id          Int     @id @default(autoincrement())
+  descripcion String
+  obligatoria Boolean @default(true)
+  orden       Int
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_competencia_template Int
+
+  // Foreign key relations
+  Competencia PlanFormacionCompetenciaTemplate @relation(fields: [id_competencia_template], references: [id], name: "PlanFormacionAprendizajeTemplateCompetencia")
+
+  @@unique([id_competencia_template, orden])
+}
+
+model PlanFormacionResultadoTemplate {
+  id          Int    @id @default(autoincrement())
+  descripcion String
+  orden       Int
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_competencia_template Int
+
+  // Foreign key relations
+  Competencia PlanFormacionCompetenciaTemplate @relation(fields: [id_competencia_template], references: [id], name: "PlanFormacionResultadoTemplateCompetencia")
+
+  @@unique([id_competencia_template, orden])
+}
+
+model AdjuntoFormacionTemplate {
+  id             Int     @id @default(autoincrement())
+  titulo         String
+  descripcion    String?
+  archivo        Bytes?
+  archivo_mime   String?
+  archivo_nombre String
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_plan_formacion_template Int
+
+  // Foreign key relations
+  PlanFormacionTemplate PlanFormacionTemplate @relation(fields: [id_plan_formacion_template], references: [id], name: "AdjuntoFormacionTemplatePlan")
+
+  @@unique([id_plan_formacion_template, archivo_nombre])
+}
+
+model PlanDesempenoAdulto {
+  id                      Int                   @id @default(autoincrement())
+  anio                    Int
+  estado                  ESTADO_PLAN_DESEMPENO @default(BORRADOR)
+  fecha_inicio            DateTime              @default(now())
+  fecha_cierre            DateTime?
+  observaciones_generales String?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_adulto                  Int
+  id_plan_formacion_template Int
+  id_apf_adulto              Int
+
+  // Foreign key relations
+  Adulto                Adulto                @relation(fields: [id_adulto], references: [id], name: "PlanDesempenoAdultoAdulto")
+  PlanFormacionTemplate PlanFormacionTemplate @relation(fields: [id_plan_formacion_template], references: [id], name: "PlanDesempenoAdultoPlan")
+  APF                   Adulto                @relation(fields: [id_apf_adulto], references: [id], name: "PlanDesempenoAdultoAPF")
+
+  // Relations
+  Competencias PlanDesempenoCompetencia[] @relation(name: "PlanDesempenoCompetenciaPlan")
+  Certificados PlanDesempenoCertificado[] @relation(name: "PlanDesempenoCertificadoPlan")
+
+  @@unique([id_adulto, anio, id_plan_formacion_template])
+}
+
+model PlanDesempenoCompetencia {
+  id               Int       @id @default(autoincrement())
+  validada         Boolean   @default(false)
+  observacion_apf  String?
+  fecha_validacion DateTime?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_plan_desempeno       Int
+  id_competencia_template Int
+  id_apf_validador        Int?
+
+  // Foreign key relations
+  Plan                PlanDesempenoAdulto              @relation(fields: [id_plan_desempeno], references: [id], name: "PlanDesempenoCompetenciaPlan")
+  CompetenciaTemplate PlanFormacionCompetenciaTemplate @relation(fields: [id_competencia_template], references: [id], name: "PlanDesempenoCompetenciaTemplate")
+  APFValidador        Adulto?                          @relation(fields: [id_apf_validador], references: [id], name: "PlanDesempenoCompetenciaValidador")
+
+  @@unique([id_plan_desempeno, id_competencia_template])
+}
+
+model PlanDesempenoCertificado {
+  id             Int       @id @default(autoincrement())
+  titulo         String
+  descripcion    String?
+  archivo        Bytes?
+  archivo_mime   String?
+  archivo_nombre String?
+  fecha_emision  DateTime?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_plan_desempeno       Int
+  id_competencia_template Int?
+  id_nivel_template       Int?
+
+  // Foreign key relations
+  Plan                PlanDesempenoAdulto               @relation(fields: [id_plan_desempeno], references: [id], name: "PlanDesempenoCertificadoPlan")
+  CompetenciaTemplate PlanFormacionCompetenciaTemplate? @relation(fields: [id_competencia_template], references: [id], name: "PlanDesempenoCertificadoCompetencia")
+  NivelTemplate       PlanFormacionNivelTemplate?       @relation(fields: [id_nivel_template], references: [id], name: "PlanDesempenoCertificadoNivel")
 }
 
 //
@@ -564,15 +748,15 @@ model Certificado {
 // @TemarioConsejo
 //
 model Consejo {
-  id           Int       @id @default(autoincrement())
-  nombre       String
-  descripcion  String?
-  fecha        DateTime  @default(now())
-  es_ordinario Boolean   @default(true)
-  hora_inicio  DateTime?
-  hora_fin     DateTime?
-  id_moderador Int?
-  id_secretario Int?
+  id               Int       @id @default(autoincrement())
+  nombre           String
+  descripcion      String?
+  fecha            DateTime  @default(now())
+  es_ordinario     Boolean   @default(true)
+  hora_inicio      DateTime?
+  hora_fin         DateTime?
+  id_moderador     Int?
+  id_secretario    Int?
   id_prosecretario Int?
 
   borrado   Boolean  @default(false)
@@ -580,13 +764,33 @@ model Consejo {
   updatedAt DateTime @updatedAt
 
   // Foreign key relations
-  Moderador Miembro? @relation(fields: [id_moderador], references: [id], name: "ConsejoModerador")
-  Secretario Miembro? @relation(fields: [id_secretario], references: [id], name: "ConsejoSecretario")
+  Moderador     Miembro? @relation(fields: [id_moderador], references: [id], name: "ConsejoModerador")
+  Secretario    Miembro? @relation(fields: [id_secretario], references: [id], name: "ConsejoSecretario")
   Prosecretario Miembro? @relation(fields: [id_prosecretario], references: [id], name: "ConsejoProsecretario")
 
   // Relations
   AsistenciaConsejo AsistenciaConsejo[] @relation(name: "AsistenciaConsejoConsejo")
   TemarioConsejo    TemarioConsejo[]    @relation(name: "TemarioConsejoConsejo")
+  AsignacionesAPF   AsignacionAPF[]     @relation(name: "AsignacionAPFConsejo")
+}
+
+model AsignacionAPF {
+  id           Int       @id @default(autoincrement())
+  fecha_inicio DateTime  @default(now())
+  fecha_fin    DateTime?
+  observacion  String?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_adulto  Int
+  id_consejo Int
+
+  // Foreign key relations
+  Adulto  Adulto  @relation(fields: [id_adulto], references: [id], name: "AsignacionAPFAdulto")
+  Consejo Consejo @relation(fields: [id_consejo], references: [id], name: "AsignacionAPFConsejo")
 }
 
 model AsistenciaConsejo {
@@ -716,6 +920,8 @@ enum RESOURCE {
   PARTICIPANTE_COMISION
   CONSEJO
   ASISTENCIA_CONSEJO
+  PLAN_DESEMPENO
+  ADJUNTO_FORMACION
 }
 
 model Permission {

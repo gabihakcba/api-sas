@@ -14,6 +14,7 @@ import { EventosModule } from './eventos/eventos.module';
 import { MetodosPagoModule } from './metodos-pago/metodos-pago.module';
 import { PagosModule } from './pagos/pagos.module';
 import { PerfilesModule } from './perfiles/perfiles.module';
+import { PlanFormacionModule } from './plan-formacion/plan-formacion.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProtagonistasModule } from './protagonistas/protagonistas.module';
 import { RamasModule } from './ramas/ramas.module';
@@ -39,6 +40,7 @@ import { TiposEventoModule } from './tipos-evento/tipos-evento.module';
     MetodosPagoModule,
     PagosModule,
     PerfilesModule,
+    PlanFormacionModule,
     ProtagonistasModule,
     AdultosModule,
     RamasModule,
