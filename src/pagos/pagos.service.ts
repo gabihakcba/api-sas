@@ -434,6 +434,7 @@ export class PagosService {
       comprobante_pago_mime: true,
       comprobante_pago_nombre: true,
       fecha_pago: true,
+      createdAt: true,
       codigo_validacion: true,
       Miembro: {
         select: {

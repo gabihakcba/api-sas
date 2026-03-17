@@ -3,12 +3,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { Prisma, SCOPE } from '@prisma/client';
+import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssignEventoComisionDto } from './dto/assign-evento-comision.dto';
 import { CalendarEventosQueryDto } from './dto/calendar-eventos-query.dto';
 import { CreateEventoDto } from './dto/create-evento.dto';
+import { EventosQueryDto } from './dto/eventos-query.dto';
 import { UpdateEventoAfectacionesDto } from './dto/update-evento-afectaciones.dto';
 import { UpdateEventoInscripcionesDto } from './dto/update-evento-inscripciones.dto';
 import { UpdateEventoDto } from './dto/update-evento.dto';
@@ -17,11 +18,36 @@ import { UpdateEventoDto } from './dto/update-evento.dto';
 export class EventosService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(query: PaginationQueryDto) {
+  async findAll(user: AuthenticatedUser, query: EventosQueryDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
-    const where = { borrado: false };
+    const trimmedQuery = query.q?.trim();
+    const numericQuery =
+      trimmedQuery && /^\d+$/.test(trimmedQuery) ? Number(trimmedQuery) : null;
+    const where = this.mergeEventoWhere(
+      {
+        borrado: false,
+        ...(trimmedQuery
+          ? {
+              OR: [
+                { nombre: { contains: trimmedQuery, mode: 'insensitive' } },
+                {
+                  descripcion: {
+                    contains: trimmedQuery,
+                    mode: 'insensitive',
+                  },
+                },
+                { lugar: { contains: trimmedQuery, mode: 'insensitive' } },
+                ...(numericQuery ? [{ id: numericQuery }] : []),
+              ],
+            }
+          : {}),
+        ...(query.idTipo !== undefined ? { id_tipo: query.idTipo } : {}),
+        ...this.buildEventoDateWhere(query.fechaDesde, query.fechaHasta),
+      },
+      this.buildEventoScopeWhere(user),
+    );
 
     const [data, total] = await this.prisma.$transaction([
       this.prisma.evento.findMany({
@@ -47,7 +73,7 @@ export class EventosService {
     };
   }
 
-  async getOptions() {
+  async getOptions(user: AuthenticatedUser) {
     const [tipos, areas, ramas, miembros, comisiones] = await this.prisma.$transaction([
       this.prisma.tipoEvento.findMany({
         where: { borrado: false },
@@ -65,7 +91,7 @@ export class EventosService {
         select: { id: true, nombre: true, id_area: true },
       }),
       this.prisma.miembro.findMany({
-        where: { borrado: false },
+        where: this.buildVisibleMiembroWhere(user),
         orderBy: [{ apellidos: 'asc' }, { nombre: 'asc' }],
         select: {
           id: true,
@@ -84,7 +110,10 @@ export class EventosService {
     return { tipos, areas, ramas, miembros, comisiones };
   }
 
-  async getCalendarEvents(query: CalendarEventosQueryDto) {
+  async getCalendarEvents(
+    _user: AuthenticatedUser,
+    query: CalendarEventosQueryDto,
+  ) {
     const from = new Date(query.from);
     const to = new Date(query.to);
 
@@ -172,9 +201,12 @@ export class EventosService {
     });
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, user: AuthenticatedUser) {
     const evento = await this.prisma.evento.findFirst({
-      where: { id, borrado: false },
+      where: this.mergeEventoWhere(
+        { id, borrado: false },
+        this.buildEventoScopeWhere(user),
+      ),
       select: this.eventoDetailSelect(),
     });
 
@@ -185,11 +217,12 @@ export class EventosService {
     return evento;
   }
 
-  async create(dto: CreateEventoDto) {
+  async create(dto: CreateEventoDto, user: AuthenticatedUser) {
+    const normalizedAfectaciones = await this.resolveCreateAfectaciones(dto, user);
     this.validateDates(dto.fechaInicio, dto.fechaFin);
     await this.ensureTipoExists(dto.idTipo);
-    await this.ensureAreasExist(dto.areaIds ?? []);
-    await this.ensureRamasExist(dto.ramaIds ?? []);
+    await this.ensureAreasExist(normalizedAfectaciones.areaIds);
+    await this.ensureRamasExist(normalizedAfectaciones.ramaIds);
 
     const created = await this.prisma.evento.create({
       data: {
@@ -204,20 +237,20 @@ export class EventosService {
         costo_ayudante: new Prisma.Decimal(dto.costoAyudante),
         id_tipo: dto.idTipo,
         AreaAfectada: {
-          create: (dto.areaIds ?? []).map((idArea) => ({ id_area: idArea })),
+          create: normalizedAfectaciones.areaIds.map((idArea) => ({ id_area: idArea })),
         },
         RamaAfectada: {
-          create: (dto.ramaIds ?? []).map((idRama) => ({ id_rama: idRama })),
+          create: normalizedAfectaciones.ramaIds.map((idRama) => ({ id_rama: idRama })),
         },
       },
       select: { id: true },
     });
 
-    return this.findOne(created.id);
+    return this.findOne(created.id, user);
   }
 
-  async update(id: number, dto: UpdateEventoDto) {
-    await this.ensureEventoExists(id);
+  async update(id: number, dto: UpdateEventoDto, user: AuthenticatedUser) {
+    await this.ensureEventoExists(id, user);
     if (dto.fechaInicio && dto.fechaFin) {
       this.validateDates(dto.fechaInicio, dto.fechaFin);
     }
@@ -226,6 +259,15 @@ export class EventosService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      const normalizedAfectaciones =
+        dto.areaIds !== undefined || dto.ramaIds !== undefined
+          ? await this.resolveScopedAfectaciones(
+              user,
+              dto.areaIds ?? [],
+              dto.ramaIds ?? [],
+            )
+          : null;
+
       await tx.evento.update({
         where: { id },
         data: {
@@ -250,29 +292,29 @@ export class EventosService {
         },
       });
 
-      if (dto.areaIds !== undefined || dto.ramaIds !== undefined) {
-        await this.syncAfectacionesWithinClient(tx, id, dto);
+      if (normalizedAfectaciones) {
+        await this.syncAfectacionesWithinClient(tx, id, normalizedAfectaciones);
       }
 
-      return this.findOneWithinClient(tx, id);
+      return this.findOneWithinClient(tx, id, user);
     });
   }
 
-  async remove(id: number) {
-    await this.ensureEventoExists(id);
+  async remove(id: number, user: AuthenticatedUser) {
+    await this.ensureEventoExists(id, user);
     await this.prisma.evento.update({
       where: { id },
       data: { borrado: true },
     });
   }
 
-  async getInscripciones(id: number) {
-    await this.ensureEventoExists(id);
+  async getInscripciones(id: number, user: AuthenticatedUser) {
+    await this.ensureEventoExists(id, user);
     return this.prisma.inscripcionEvento.findMany({
       where: {
         id_evento: id,
         borrado: false,
-        Miembro: { borrado: false },
+        Miembro: this.buildVisibleMiembroWhere(user),
       },
       orderBy: [{ Miembro: { apellidos: 'asc' } }, { Miembro: { nombre: 'asc' } }],
       select: {
@@ -289,9 +331,13 @@ export class EventosService {
     });
   }
 
-  async updateInscripciones(id: number, dto: UpdateEventoInscripcionesDto) {
-    await this.ensureEventoExists(id);
-    await this.ensureMiembrosExist(dto.miembroIds);
+  async updateInscripciones(
+    id: number,
+    dto: UpdateEventoInscripcionesDto,
+    user: AuthenticatedUser,
+  ) {
+    await this.ensureEventoExists(id, user);
+    await this.ensureMiembrosExist(dto.miembroIds, user);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.inscripcionEvento.updateMany({
@@ -339,26 +385,40 @@ export class EventosService {
       }
     });
 
-    return this.getInscripciones(id);
+    return this.getInscripciones(id, user);
   }
 
-  async updateAfectaciones(id: number, dto: UpdateEventoAfectacionesDto) {
-    await this.ensureEventoExists(id);
+  async updateAfectaciones(
+    id: number,
+    dto: UpdateEventoAfectacionesDto,
+    user: AuthenticatedUser,
+  ) {
+    await this.ensureEventoExists(id, user);
+    const normalizedAfectaciones = await this.resolveScopedAfectaciones(
+      user,
+      dto.areaIds ?? [],
+      dto.ramaIds ?? [],
+    );
+
     return this.prisma.$transaction(async (tx) => {
-      await this.syncAfectacionesWithinClient(tx, id, dto);
-      return this.findOneWithinClient(tx, id);
+      await this.syncAfectacionesWithinClient(tx, id, normalizedAfectaciones);
+      return this.findOneWithinClient(tx, id, user);
     });
   }
 
-  async assignComision(id: number, dto: AssignEventoComisionDto) {
-    await this.ensureEventoExists(id);
+  async assignComision(
+    id: number,
+    dto: AssignEventoComisionDto,
+    user: AuthenticatedUser,
+  ) {
+    await this.ensureEventoExists(id, user);
 
     if (dto.idComision === null) {
       await this.prisma.comision.updateMany({
         where: { id_evento: id, borrado: false },
         data: { id_evento: null },
       });
-      return this.findOne(id);
+      return this.findOne(id, user);
     }
 
     if (dto.idComision === undefined) {
@@ -379,7 +439,7 @@ export class EventosService {
       data: { id_evento: id },
     });
 
-    return this.findOne(id);
+    return this.findOne(id, user);
   }
 
   private async syncAfectacionesWithinClient(
@@ -450,9 +510,12 @@ export class EventosService {
     }
   }
 
-  private async ensureEventoExists(id: number) {
+  private async ensureEventoExists(id: number, user: AuthenticatedUser) {
     const evento = await this.prisma.evento.findFirst({
-      where: { id, borrado: false },
+      where: this.mergeEventoWhere(
+        { id, borrado: false },
+        this.buildEventoScopeWhere(user),
+      ),
       select: { id: true },
     });
 
@@ -495,15 +558,19 @@ export class EventosService {
     }
   }
 
-  private async ensureMiembrosExist(ids: number[]) {
+  private async ensureMiembrosExist(ids: number[], user: AuthenticatedUser) {
     if (ids.length === 0) {
       return;
     }
     const count = await this.prisma.miembro.count({
-      where: { id: { in: ids }, borrado: false },
+      where: {
+        AND: [this.buildVisibleMiembroWhere(user), { id: { in: ids } }],
+      },
     });
     if (count !== ids.length) {
-      throw new NotFoundException('Uno o más miembros indicados no existen.');
+      throw new NotFoundException(
+        'Uno o más miembros indicados no existen o no están dentro de tu alcance.',
+      );
     }
   }
 
@@ -564,9 +631,13 @@ export class EventosService {
   private async findOneWithinClient(
     client: PrismaService | Prisma.TransactionClient,
     id: number,
+    user: AuthenticatedUser,
   ) {
     const evento = await client.evento.findFirst({
-      where: { id, borrado: false },
+      where: this.mergeEventoWhere(
+        { id, borrado: false },
+        this.buildEventoScopeWhere(user),
+      ),
       select: this.eventoDetailSelect(),
     });
 
@@ -575,5 +646,262 @@ export class EventosService {
     }
 
     return evento;
+  }
+
+  private buildEventoScopeWhere(
+    user: AuthenticatedUser,
+  ): Prisma.EventoWhereInput | undefined {
+    if (
+      user.roles.includes('ADM') ||
+      user.roles.includes('OWN') ||
+      user.roles.includes('JEFATURA')
+    ) {
+      return undefined;
+    }
+
+    const filters: Prisma.EventoWhereInput[] = [];
+
+    for (const scope of user.scopes) {
+      if (scope.scopeId == null) {
+        continue;
+      }
+
+      if (
+        (scope.role === 'JEFATURA_RAMA' || scope.role === 'AYUDANTE_RAMA') &&
+        scope.scopeType === SCOPE.RAMA
+      ) {
+        filters.push({
+          RamaAfectada: {
+            some: {
+              id_rama: scope.scopeId,
+              borrado: false,
+            },
+          },
+        });
+      }
+    }
+
+    if (filters.length === 0) {
+      return {
+        id: -1,
+      };
+    }
+
+    return filters.length === 1 ? filters[0] : { OR: filters };
+  }
+
+  private mergeEventoWhere(
+    baseWhere: Prisma.EventoWhereInput,
+    scopeWhere?: Prisma.EventoWhereInput,
+  ): Prisma.EventoWhereInput {
+    if (!scopeWhere) {
+      return baseWhere;
+    }
+
+    return {
+      AND: [baseWhere, scopeWhere],
+    };
+  }
+
+  private buildEventoDateWhere(
+    fechaDesde?: Date,
+    fechaHasta?: Date,
+  ): Prisma.EventoWhereInput {
+    if (!fechaDesde && !fechaHasta) {
+      return {};
+    }
+
+    return {
+      AND: [
+        ...(fechaDesde
+          ? [
+              {
+                fecha_fin: {
+                  gte: fechaDesde,
+                },
+              } satisfies Prisma.EventoWhereInput,
+            ]
+          : []),
+        ...(fechaHasta
+          ? [
+              {
+                fecha_inicio: {
+                  lte: fechaHasta,
+                },
+              } satisfies Prisma.EventoWhereInput,
+            ]
+          : []),
+      ],
+    };
+  }
+
+  private async resolveCreateAfectaciones(
+    dto: CreateEventoDto,
+    user: AuthenticatedUser,
+  ): Promise<{ areaIds: number[]; ramaIds: number[] }> {
+    return this.resolveScopedAfectaciones(user, dto.areaIds ?? [], dto.ramaIds ?? []);
+  }
+
+  private async resolveScopedAfectaciones(
+    user: AuthenticatedUser,
+    areaIds: number[],
+    ramaIds: number[],
+  ): Promise<{ areaIds: number[]; ramaIds: number[] }> {
+    if (user.roles.includes('JEFATURA')) {
+      const areaJefatura = await this.prisma.area.findFirst({
+        where: {
+          nombre: 'Jefatura',
+          borrado: false,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!areaJefatura) {
+        throw new NotFoundException('No se pudo resolver el area Jefatura.');
+      }
+
+      return {
+        areaIds: [areaJefatura.id],
+        ramaIds: [],
+      };
+    }
+
+    const ramaScopeIds = user.scopes
+      .filter(
+        (scope) =>
+          (scope.role === 'JEFATURA_RAMA' || scope.role === 'AYUDANTE_RAMA') &&
+          scope.scopeType === SCOPE.RAMA &&
+          scope.scopeId != null,
+      )
+      .map((scope) => scope.scopeId as number);
+
+    if (ramaScopeIds.length > 0) {
+      const areaRama = await this.prisma.area.findFirst({
+        where: {
+          nombre: 'Rama',
+          borrado: false,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!areaRama) {
+        throw new NotFoundException('No se pudo resolver el area Rama.');
+      }
+
+      return {
+        areaIds: [areaRama.id],
+        ramaIds: Array.from(new Set(ramaScopeIds)),
+      };
+    }
+
+    return {
+      areaIds,
+      ramaIds,
+    };
+  }
+
+  private buildVisibleMiembroWhere(user: AuthenticatedUser): Prisma.MiembroWhereInput {
+    if (
+      user.roles.includes('ADM') ||
+      user.roles.includes('OWN') ||
+      user.roles.includes('JEFATURA')
+    ) {
+      return {
+        borrado: false,
+      };
+    }
+
+    const filters: Prisma.MiembroWhereInput[] = [];
+
+    for (const scope of user.scopes) {
+      if (
+        scope.scopeId == null ||
+        (scope.role !== 'JEFATURA_RAMA' && scope.role !== 'AYUDANTE_RAMA')
+      ) {
+        continue;
+      }
+
+      if (scope.scopeType === SCOPE.RAMA) {
+        filters.push({
+          OR: [
+            {
+              MiembroRama: {
+                some: {
+                  id_rama: scope.scopeId,
+                  borrado: false,
+                  fecha_egreso: null,
+                },
+              },
+            },
+            {
+              Adulto: {
+                is: {
+                  borrado: false,
+                  activo: true,
+                  EquipoArea: {
+                    some: {
+                      id_rama: scope.scopeId,
+                      borrado: false,
+                      activo: true,
+                      fecha_fin: null,
+                    },
+                  },
+                },
+              },
+            },
+            {
+              Responsable: {
+                is: {
+                  borrado: false,
+                  Responsabilidad: {
+                    some: {
+                      borrado: false,
+                      Protagonista: {
+                        borrado: false,
+                        Miembro: {
+                          MiembroRama: {
+                            some: {
+                              id_rama: scope.scopeId,
+                              borrado: false,
+                              fecha_egreso: null,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        });
+      }
+    }
+
+    if (filters.length === 0) {
+      return {
+        id: -1,
+        borrado: false,
+      };
+    }
+
+    if (filters.length === 1) {
+      return {
+        AND: [{ borrado: false }, filters[0]],
+      };
+    }
+
+    return {
+      AND: [
+        { borrado: false },
+        {
+          OR: filters,
+        },
+      ],
+    };
   }
 }

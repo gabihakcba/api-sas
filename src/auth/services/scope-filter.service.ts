@@ -56,22 +56,15 @@ export class ScopeFilterService {
       return {};
     }
 
-    const cuentasWhere = this.forCuentasDinero(user);
+    const filters = this.buildPagoFilters(user);
 
-    if (Object.keys(cuentasWhere).length === 0) {
-      return {};
+    if (filters.length === 0) {
+      return {
+        id: -1,
+      };
     }
 
-    return {
-      OR: [
-        {
-          CuentaDinero: cuentasWhere as Prisma.CuentaDineroWhereInput,
-        },
-        {
-          CuentaOrigen: cuentasWhere as Prisma.CuentaDineroWhereInput,
-        },
-      ],
-    };
+    return this.toWhereInput(filters);
   }
 
   forRamas(user: AuthenticatedUser): ScopedWhere<Prisma.RamaWhereInput> {
@@ -313,41 +306,199 @@ export class ScopeFilterService {
     return filters;
   }
 
-  private buildPagoFilters(
-    scopes: AuthenticatedScope[],
-  ): Prisma.PagoWhereInput[] {
+  private buildPagoFilters(user: AuthenticatedUser): Prisma.PagoWhereInput[] {
     const filters: Prisma.PagoWhereInput[] = [];
 
-    for (const scope of scopes) {
+    for (const scope of user.scopes) {
       if (scope.scopeId == null) {
+        continue;
+      }
+
+      if (!ADULT_ACCOUNT_SCOPE_ROLES.has(scope.role)) {
         continue;
       }
 
       if (scope.scopeType === SCOPE.RAMA) {
         filters.push({
-          CuentaDinero: {
-            id_rama: scope.scopeId,
-            borrado: false,
-          },
-        });
-      }
-
-      if (scope.scopeType === SCOPE.AREA) {
-        filters.push({
-          CuentaDinero: {
+          Miembro: {
             borrado: false,
             OR: [
-              { id_area: scope.scopeId },
               {
-                Rama: {
-                  id_area: scope.scopeId,
-                  borrado: false,
+                MiembroRama: {
+                  some: {
+                    id_rama: scope.scopeId,
+                    borrado: false,
+                    fecha_egreso: null,
+                  },
+                },
+              },
+              {
+                Adulto: {
+                  is: {
+                    borrado: false,
+                    activo: true,
+                    EquipoArea: {
+                      some: {
+                        id_rama: scope.scopeId,
+                        borrado: false,
+                        activo: true,
+                        fecha_fin: null,
+                      },
+                    },
+                  },
+                },
+              },
+              {
+                Responsable: {
+                  is: {
+                    borrado: false,
+                    Responsabilidad: {
+                      some: {
+                        borrado: false,
+                        Protagonista: {
+                          borrado: false,
+                          Miembro: {
+                            MiembroRama: {
+                              some: {
+                                id_rama: scope.scopeId,
+                                borrado: false,
+                                fecha_egreso: null,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
                 },
               },
             ],
           },
         });
       }
+
+      if (scope.scopeType === SCOPE.AREA) {
+        filters.push({
+          Miembro: {
+            borrado: false,
+            OR: [
+              {
+                MiembroRama: {
+                  some: {
+                    borrado: false,
+                    fecha_egreso: null,
+                    Rama: {
+                      id_area: scope.scopeId,
+                      borrado: false,
+                    },
+                  },
+                },
+              },
+              {
+                Adulto: {
+                  is: {
+                    borrado: false,
+                    activo: true,
+                    EquipoArea: {
+                      some: {
+                        borrado: false,
+                        activo: true,
+                        fecha_fin: null,
+                        OR: [
+                          { id_area: scope.scopeId },
+                          {
+                            Rama: {
+                              id_area: scope.scopeId,
+                              borrado: false,
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+              {
+                Responsable: {
+                  is: {
+                    borrado: false,
+                    Responsabilidad: {
+                      some: {
+                        borrado: false,
+                        Protagonista: {
+                          borrado: false,
+                          Miembro: {
+                            MiembroRama: {
+                              some: {
+                                borrado: false,
+                                fecha_egreso: null,
+                                Rama: {
+                                  id_area: scope.scopeId,
+                                  borrado: false,
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        });
+      }
+    }
+
+    if (user.roles.includes('PROTAGONISTA')) {
+      filters.push({
+        Miembro: {
+          id_cuenta: user.userId,
+          borrado: false,
+          Protagonista: {
+            is: {
+              borrado: false,
+              activo: true,
+            },
+          },
+        },
+      });
+    }
+
+    if (user.roles.includes('RESPONSABLE')) {
+      filters.push({
+        OR: [
+          {
+            Responsable: {
+              id_cuenta: user.userId,
+              borrado: false,
+            },
+          },
+          {
+            Miembro: {
+              borrado: false,
+              Protagonista: {
+                is: {
+                  borrado: false,
+                  Responsabilidad: {
+                    some: {
+                      borrado: false,
+                      Responsable: {
+                        Miembro: {
+                          id_cuenta: user.userId,
+                          borrado: false,
+                        },
+                        borrado: false,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      });
     }
 
     return filters;
@@ -409,6 +560,32 @@ export class ScopeFilterService {
                 },
               },
             },
+            {
+              Miembro: {
+                Responsable: {
+                  is: {
+                    borrado: false,
+                    Responsabilidad: {
+                      some: {
+                        borrado: false,
+                        Protagonista: {
+                          borrado: false,
+                          Miembro: {
+                            MiembroRama: {
+                              some: {
+                                id_rama: scope.scopeId,
+                                borrado: false,
+                                fecha_egreso: null,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           ],
         });
       }
@@ -464,6 +641,35 @@ export class ScopeFilterService {
                             },
                           },
                         ],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            {
+              Miembro: {
+                Responsable: {
+                  is: {
+                    borrado: false,
+                    Responsabilidad: {
+                      some: {
+                        borrado: false,
+                        Protagonista: {
+                          borrado: false,
+                          Miembro: {
+                            MiembroRama: {
+                              some: {
+                                borrado: false,
+                                fecha_egreso: null,
+                                Rama: {
+                                  id_area: scope.scopeId,
+                                  borrado: false,
+                                },
+                              },
+                            },
+                          },
+                        },
                       },
                     },
                   },

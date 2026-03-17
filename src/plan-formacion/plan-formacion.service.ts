@@ -328,6 +328,12 @@ export class PlanFormacionService {
 
   async getAdminWorkspace(user: AuthenticatedUser) {
     const currentAdult = await this.findCurrentAdult(user.memberId);
+    const canEdit = currentAdult !== null;
+    const canCreatePlan = currentAdult !== null;
+    const canManageApf =
+      currentAdult !== null &&
+      (user.roles.includes('JEFATURA') ||
+        (await this.hasActiveApfAssignment(currentAdult.id)));
 
     const [templates, areas, apfs, adultos, consejos] = await this.prisma.$transaction([
       this.prisma.planFormacionTemplate.findMany({
@@ -441,12 +447,14 @@ export class PlanFormacionService {
     ]);
 
     return {
-      canManage: currentAdult !== null,
+      canEdit,
+      canCreatePlan,
+      canManageApf,
       templates,
       areas,
-      apfAssignments: currentAdult ? apfs : [],
-      adults: currentAdult ? adultos : [],
-      consejos: currentAdult ? consejos : [],
+      apfAssignments: canManageApf ? apfs : [],
+      adults: canManageApf ? adultos : [],
+      consejos: canManageApf ? consejos : [],
     };
   }
 
@@ -809,7 +817,7 @@ export class PlanFormacionService {
     user: AuthenticatedUser,
     dto: CreateAsignacionApfDto,
   ) {
-    await this.ensureAdultUser(user);
+    await this.ensureCanManageApf(user);
 
     const [adulto, consejo, asignacionActual] = await this.prisma.$transaction([
       this.prisma.adulto.findFirst({
@@ -872,7 +880,7 @@ export class PlanFormacionService {
   }
 
   async closeAsignacionApf(user: AuthenticatedUser, id: number) {
-    await this.ensureAdultUser(user);
+    await this.ensureCanManageApf(user);
 
     const asignacion = await this.prisma.asignacionAPF.findFirst({
       where: {
@@ -1286,6 +1294,24 @@ export class PlanFormacionService {
     await this.resolveAdultFromMemberId(user.memberId);
   }
 
+  private async ensureCanManageApf(user: AuthenticatedUser) {
+    const adultoActual = await this.resolveAdultFromMemberId(user.memberId);
+
+    if (user.roles.includes('JEFATURA')) {
+      return adultoActual;
+    }
+
+    const isActiveApf = await this.hasActiveApfAssignment(adultoActual.id);
+
+    if (!isActiveApf) {
+      throw new ForbiddenException(
+        'Solo jefatura o APFs activos pueden gestionar habilitaciones APF.',
+      );
+    }
+
+    return adultoActual;
+  }
+
   private async resolveAdultFromMemberId(memberId: number | null) {
     const adulto = await this.findCurrentAdult(memberId);
 
@@ -1323,5 +1349,20 @@ export class PlanFormacionService {
         },
       },
     });
+  }
+
+  private async hasActiveApfAssignment(adultoId: number) {
+    const assignment = await this.prisma.asignacionAPF.findFirst({
+      where: {
+        id_adulto: adultoId,
+        borrado: false,
+        fecha_fin: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return assignment !== null;
   }
 }

@@ -82,6 +82,11 @@ type ConsejoExportData = {
 
 @Injectable()
 export class ConsejosService {
+  private static readonly CONSEJO_ALLOWED_PROTAGONISTA_RAMAS = [
+    'Caminantes',
+    'Rovers',
+  ] as const;
+
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(user: AuthenticatedUser, paginationQuery: PaginationQueryDto) {
@@ -182,6 +187,7 @@ export class ConsejosService {
       where: {
         id_consejo: idConsejo,
         borrado: false,
+        Miembro: this.buildConsejoAttendanceEligibleWhere(),
       },
       orderBy: [
         { Miembro: { apellidos: 'asc' } },
@@ -206,35 +212,8 @@ export class ConsejosService {
     const search = query.q?.trim();
     const miembros = await this.prisma.miembro.findMany({
       where: {
-        borrado: false,
+        ...this.buildConsejoAttendanceEligibleWhere(),
         AND: [
-          {
-            OR: [
-              {
-                Adulto: {
-                  is: {
-                    borrado: false,
-                    activo: true,
-                  },
-                },
-              },
-              {
-                Protagonista: {
-                  is: {
-                    borrado: false,
-                    activo: true,
-                  },
-                },
-              },
-              {
-                Responsable: {
-                  is: {
-                    borrado: false,
-                  },
-                },
-              },
-            ],
-          },
           ...(search
             ? [
                 {
@@ -332,13 +311,15 @@ export class ConsejosService {
     const miembro = await this.prisma.miembro.findFirst({
       where: {
         id: dto.idMiembro,
-        borrado: false,
+        ...this.buildConsejoAttendanceEligibleWhere(),
       },
       select: this.memberAttendanceSelect(),
     });
 
     if (!miembro) {
-      throw new NotFoundException('El miembro indicado no existe.');
+      throw new NotFoundException(
+        'El miembro indicado no existe o no es elegible para asistencia de consejo.',
+      );
     }
 
     const alreadyExists = await this.prisma.asistenciaConsejo.findFirst({
@@ -651,6 +632,52 @@ export class ConsejosService {
     } satisfies Prisma.MiembroSelect;
   }
 
+  private buildConsejoAttendanceEligibleWhere(): Prisma.MiembroWhereInput {
+    return {
+      borrado: false,
+      OR: [
+        {
+          Adulto: {
+            is: {
+              borrado: false,
+              activo: true,
+            },
+          },
+        },
+        {
+          Responsable: {
+            is: {
+              borrado: false,
+            },
+          },
+        },
+        {
+          Protagonista: {
+            is: {
+              borrado: false,
+              activo: true,
+              Miembro: {
+                MiembroRama: {
+                  some: {
+                    borrado: false,
+                    fecha_egreso: null,
+                    Rama: {
+                      nombre: {
+                        in: [
+                          ...ConsejosService.CONSEJO_ALLOWED_PROTAGONISTA_RAMAS,
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      ],
+    };
+  }
+
   private async ensureAdultMember(memberId: number | null) {
     if (!memberId) {
       throw new BadRequestException('El miembro indicado no es válido.');
@@ -716,7 +743,9 @@ export class ConsejosService {
     dto: UpdateTemarioConsejoDto,
   ) {
     const wantsRestrictedUpdate =
-      dto.debate !== undefined || dto.acuerdo !== undefined;
+      dto.debate !== undefined ||
+      dto.acuerdo !== undefined ||
+      dto.estado !== undefined;
 
     if (!wantsRestrictedUpdate) {
       return;

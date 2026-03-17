@@ -28,6 +28,8 @@ const ADULT_MEMBER_ROLES = new Set([
   'INTENDENCIA',
 ]);
 
+const ADULT_READ_ONLY_ROLES = new Set(['SECRETARIA_TESORERIA', 'INTENDENCIA']);
+
 const ADMIN_BYPASS_ROLES = new Set(['ADM', 'OWN']);
 @Injectable()
 export class AuthService {
@@ -166,8 +168,11 @@ export class AuthService {
     const hasAdultMemberRole = roles.some((role) =>
       ADULT_MEMBER_ROLES.has(role),
     );
+    const hasAdultReadOnlyRole = roles.some((role) =>
+      ADULT_READ_ONLY_ROLES.has(role),
+    );
 
-    if (hasAdminBypassRole || !hasAdultMemberRole) {
+    if (hasAdminBypassRole || !hasAdultMemberRole || !hasAdultReadOnlyRole) {
       return;
     }
 

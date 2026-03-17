@@ -10,6 +10,7 @@ import {
   Patch,
   Post,
   Query,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { CheckPermissions } from '../auth/decorators/permissions.decorator';
@@ -17,9 +18,11 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { AuthenticatedRequest } from '../auth/types/auth-request.types';
 import { ComisionesService } from './comisiones.service';
+import { ComisionesQueryDto } from './dto/comisiones-query.dto';
 import { CreateComisionDto } from './dto/create-comision.dto';
+import { UpdateComisionParticipantesDto } from './dto/update-comision-participantes.dto';
 import { UpdateComisionDto } from './dto/update-comision.dto';
 
 const ADULT_ROLES = [
@@ -37,7 +40,7 @@ export class ComisionesController {
   @Get()
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @CheckPermissions('READ:COMISION')
-  async findAll(@Query() query: PaginationQueryDto) {
+  async findAll(@Query() query: ComisionesQueryDto) {
     return this.comisionesService.findAll(query);
   }
 
@@ -73,6 +76,25 @@ export class ComisionesController {
     @Body() dto: UpdateComisionDto,
   ) {
     return this.comisionesService.update(id, dto);
+  }
+
+  @Get(':id/participantes')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('READ:COMISION')
+  async getParticipantes(@Param('id', ParseIntPipe) id: number) {
+    return this.comisionesService.getParticipantes(id);
+  }
+
+  @Patch(':id/participantes')
+  @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
+  @CheckPermissions('UPDATE:COMISION')
+  @Roles(...ADULT_ROLES)
+  async updateParticipantes(
+    @Request() _req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateComisionParticipantesDto,
+  ) {
+    return this.comisionesService.updateParticipantes(id, dto);
   }
 
   @Delete(':id')

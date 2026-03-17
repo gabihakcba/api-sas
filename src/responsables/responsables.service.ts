@@ -198,6 +198,13 @@ export class ResponsablesService {
         },
       });
 
+      await this.ensureCuentaDineroResponsable(
+        tx,
+        account.miembroId,
+        dto.nombre,
+        dto.apellidos,
+      );
+
       return account;
     });
 
@@ -443,6 +450,44 @@ export class ResponsablesService {
     });
 
     return created.id;
+  }
+
+  private async ensureCuentaDineroResponsable(
+    tx: Prisma.TransactionClient,
+    miembroId: number,
+    nombre: string,
+    apellidos: string,
+  ) {
+    const existing = await tx.cuentaDinero.findFirst({
+      where: {
+        id_miembro: miembroId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const data = {
+      nombre: `Caja ${nombre} ${apellidos}`.trim(),
+      descripcion:
+        `Cuenta personal del responsable ${nombre} ${apellidos}`.trim(),
+      id_miembro: miembroId,
+      id_area: null,
+      id_rama: null,
+      borrado: false,
+    };
+
+    if (existing) {
+      await tx.cuentaDinero.update({
+        where: { id: existing.id },
+        data,
+      });
+      return;
+    }
+
+    await tx.cuentaDinero.create({
+      data,
+    });
   }
 
   private responsableListSelect() {

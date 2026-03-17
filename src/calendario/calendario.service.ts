@@ -41,6 +41,14 @@ export class CalendarioService {
             id: true,
           },
         },
+        Responsable: {
+          where: {
+            borrado: false,
+          },
+          select: {
+            id: true,
+          },
+        },
         MiembroRama: {
           where: {
             borrado: false,
@@ -100,7 +108,7 @@ export class CalendarioService {
         nombreCompleto: string;
         dni: string;
         fecha: Date;
-        tipoMiembro: 'protagonista' | 'adulto' | 'otro';
+        tipoMiembro: 'protagonista' | 'responsable' | 'adulto' | 'otro';
         ramaNombre: string | null;
         areaNombre: string | null;
       }> = [];
@@ -114,6 +122,8 @@ export class CalendarioService {
       const currentArea = miembro.Adulto?.EquipoArea[0]?.Area.nombre ?? null;
       const memberType = miembro.Protagonista
         ? 'protagonista'
+        : miembro.Responsable
+          ? 'responsable'
         : miembro.Adulto
           ? 'adulto'
           : 'otro';

@@ -52,6 +52,7 @@ const INTENDENCIA_READONLY_RESOURCES = [
 const RAMA_FULL_ACCESS_RESOURCES = [
   RESOURCE.MIEMBRO,
   RESOURCE.PROTAGONISTA,
+  RESOURCE.ADULTO,
   RESOURCE.RELACION,
   RESOURCE.EVENTO,
   RESOURCE.INSCRIPCION,
@@ -63,7 +64,6 @@ const RAMA_FULL_ACCESS_RESOURCES = [
 ] as const;
 
 const RAMA_READONLY_RESOURCES = [
-  RESOURCE.ADULTO,
   RESOURCE.RESPONSABLE,
   RESOURCE.PLAN_FORMACION,
   RESOURCE.PLAN_DESEMPENO,
@@ -1020,6 +1020,17 @@ const ADULT_PLAN_DESEMPENO_PERMISSIONS: RoleDefinition['permissions'][number] = 
   resources: [RESOURCE.PLAN_DESEMPENO],
 };
 
+const RESPONSABLE_READ_PERMISSIONS: RoleDefinition['permissions'][number] = {
+  actions: [ACTION.READ],
+  resources: ALL_RESOURCES,
+};
+
+const RESPONSABLE_PROTAGONISTA_UPDATE_PERMISSIONS: RoleDefinition['permissions'][number] =
+  {
+    actions: [ACTION.UPDATE],
+    resources: [RESOURCE.MIEMBRO, RESOURCE.PROTAGONISTA],
+  };
+
 const ROLE_DEFINITIONS: RoleDefinition[] = [
   {
     nombre: 'ADM',
@@ -1041,6 +1052,15 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
         actions: [ACTION.READ],
         resources: PROTAGONISTA_READONLY_RESOURCES,
       },
+    ],
+  },
+  {
+    nombre: 'RESPONSABLE',
+    descripcion:
+      'Acceso de lectura general con capacidad de editar protagonistas segun las restricciones aplicadas por el backend.',
+    permissions: [
+      RESPONSABLE_READ_PERMISSIONS,
+      RESPONSABLE_PROTAGONISTA_UPDATE_PERMISSIONS,
     ],
   },
   {
@@ -1090,7 +1110,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
   {
     nombre: 'JEFATURA_RAMA',
     descripcion:
-      'Acceso total a la informacion y edicion correspondiente a su rama.',
+      'Acceso total a protagonistas, adultos y demas gestion correspondiente a su rama.',
     permissions: [
       ...RAMA_ROLE_PERMISSIONS,
       ADULT_RESPONSABLE_PERMISSIONS,
@@ -1106,7 +1126,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
   {
     nombre: 'AYUDANTE_RAMA',
     descripcion:
-      'Mismos permisos exactos que Jefatura de Rama para mantener la gestion horizontal.',
+      'Mismos permisos exactos que Jefatura de Rama para mantener la gestion horizontal dentro de su rama.',
     permissions: [
       ...RAMA_ROLE_PERMISSIONS,
       ADULT_RESPONSABLE_PERMISSIONS,

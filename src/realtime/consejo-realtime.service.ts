@@ -16,6 +16,20 @@ type ConsejoRealtimeMemoryState = {
   raisedHands: ConsejoRealtimeHand[];
 };
 
+type ConsejoRealtimeContext = {
+  id_moderador: number | null;
+  fecha: Date;
+  hora_fin: Date | null;
+  AsistenciaConsejo: Array<{
+    descripcion: string;
+    Miembro: {
+      id: number;
+      nombre: string;
+      apellidos: string;
+    };
+  }>;
+};
+
 @Injectable()
 export class ConsejoRealtimeService {
   private readonly states = new Map<number, ConsejoRealtimeMemoryState>();
@@ -24,7 +38,7 @@ export class ConsejoRealtimeService {
 
   async getState(idConsejo: number): Promise<ConsejoRealtimeState> {
     const consejo = await this.getConsejoContext(idConsejo);
-    const state = this.getOrCreateState(idConsejo);
+    const state = this.getOrCreateState(idConsejo, consejo);
 
     return {
       speakers: state.speakers,
@@ -50,7 +64,7 @@ export class ConsejoRealtimeService {
       );
     }
 
-    const state = this.getOrCreateState(idConsejo);
+    const state = this.getOrCreateState(idConsejo, consejo);
 
     if (
       !state.raisedHands.some((item) => item.memberId === memberId) &&
@@ -68,7 +82,7 @@ export class ConsejoRealtimeService {
 
   async cancelRaiseHand(idConsejo: number, memberId: number | null) {
     const consejo = await this.getConsejoContext(idConsejo);
-    const state = this.getOrCreateState(idConsejo);
+    const state = this.getOrCreateState(idConsejo, consejo);
 
     if (memberId) {
       state.raisedHands = state.raisedHands.filter(
@@ -97,7 +111,7 @@ export class ConsejoRealtimeService {
       );
     }
 
-    const state = this.getOrCreateState(idConsejo);
+    const state = this.getOrCreateState(idConsejo, consejo);
     state.raisedHands = state.raisedHands.filter((item) => item.memberId !== memberId);
     state.speakers = state.speakers.filter((item) => item.memberId !== memberId);
     state.speakers.unshift({
@@ -116,7 +130,7 @@ export class ConsejoRealtimeService {
   ) {
     const consejo = await this.getConsejoContext(idConsejo);
     this.ensureModerator(consejo.id_moderador, actorMemberId);
-    const state = this.getOrCreateState(idConsejo);
+    const state = this.getOrCreateState(idConsejo, consejo);
     state.speakers = state.speakers.filter((item) => item.memberId !== memberId);
     return this.buildStateFromContext(consejo, state);
   }
@@ -129,7 +143,7 @@ export class ConsejoRealtimeService {
     const consejo = await this.getConsejoContext(idConsejo);
     this.ensureModerator(consejo.id_moderador, actorMemberId);
 
-    const state = this.getOrCreateState(idConsejo);
+    const state = this.getOrCreateState(idConsejo, consejo);
     const currentSpeakerIds = state.speakers.map((item) => item.memberId);
 
     if (
@@ -264,7 +278,9 @@ export class ConsejoRealtimeService {
     this.states.delete(idConsejo);
   }
 
-  private async getConsejoContext(idConsejo: number) {
+  private async getConsejoContext(
+    idConsejo: number,
+  ): Promise<ConsejoRealtimeContext> {
     const consejo = await this.prisma.consejo.findFirst({
       where: {
         id: idConsejo,
@@ -273,6 +289,8 @@ export class ConsejoRealtimeService {
       select: {
         id: true,
         id_moderador: true,
+        fecha: true,
+        hora_fin: true,
         AsistenciaConsejo: {
           where: {
             borrado: false,
@@ -309,16 +327,36 @@ export class ConsejoRealtimeService {
     }
   }
 
-  private getOrCreateState(idConsejo: number): ConsejoRealtimeMemoryState {
+  private shouldPersistState(consejo: ConsejoRealtimeContext): boolean {
+    if (!consejo.hora_fin) {
+      return true;
+    }
+
+    return consejo.hora_fin.getTime() >= Date.now();
+  }
+
+  private createEmptyState(): ConsejoRealtimeMemoryState {
+    return {
+      speakers: [],
+      raisedHands: [],
+    };
+  }
+
+  private getOrCreateState(
+    idConsejo: number,
+    consejo: ConsejoRealtimeContext,
+  ): ConsejoRealtimeMemoryState {
+    if (!this.shouldPersistState(consejo)) {
+      this.clearState(idConsejo);
+      return this.createEmptyState();
+    }
+
     const existing = this.states.get(idConsejo);
     if (existing) {
       return existing;
     }
 
-    const created: ConsejoRealtimeMemoryState = {
-      speakers: [],
-      raisedHands: [],
-    };
+    const created = this.createEmptyState();
     this.states.set(idConsejo, created);
     return created;
   }

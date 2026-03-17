@@ -1,4 +1,11 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class CreateComisionDto {
   @IsString()
@@ -10,4 +17,9 @@ export class CreateComisionDto {
   @IsString()
   @MaxLength(500)
   descripcion?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  idEvento?: number;
 }
