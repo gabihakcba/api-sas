@@ -256,96 +256,12 @@ export class PerfilesService {
       select: {
         Protagonista: {
           select: {
-            Responsabilidad: {
-              where: {
-                borrado: false,
-                Responsable: {
-                  borrado: false,
-                  Miembro: {
-                    borrado: false,
-                  },
-                },
-              },
-              select: {
-                id: true,
-                Relacion: {
-                  select: {
-                    id: true,
-                    tipo: true,
-                  },
-                },
-                Responsable: {
-                  select: {
-                    id: true,
-                    Miembro: {
-                      select: {
-                        id: true,
-                        nombre: true,
-                        apellidos: true,
-                        dni: true,
-                        telefono: true,
-                        email: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
+            id: true,
           },
         },
         Responsable: {
           select: {
-            Responsabilidad: {
-              where: {
-                borrado: false,
-                Protagonista: {
-                  borrado: false,
-                  Miembro: {
-                    borrado: false,
-                  },
-                },
-              },
-              select: {
-                id: true,
-                Relacion: {
-                  select: {
-                    id: true,
-                    tipo: true,
-                  },
-                },
-                Protagonista: {
-                  select: {
-                    id: true,
-                    Miembro: {
-                      select: {
-                        id: true,
-                        nombre: true,
-                        apellidos: true,
-                        dni: true,
-                        MiembroRama: {
-                          where: {
-                            borrado: false,
-                            fecha_egreso: null,
-                          },
-                          orderBy: {
-                            fecha_ingreso: 'desc',
-                          },
-                          take: 1,
-                          select: {
-                            Rama: {
-                              select: {
-                                id: true,
-                                nombre: true,
-                              },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
+            id: true,
           },
         },
       },
@@ -355,9 +271,104 @@ export class PerfilesService {
       throw new NotFoundException('El perfil indicado no existe.');
     }
 
+    const [responsables, protagonistas] = await Promise.all([
+      miembro.Protagonista
+        ? this.prisma.responsabilidad.findMany({
+            where: {
+              borrado: false,
+              id_protagonista: miembro.Protagonista.id,
+              Responsable: {
+                borrado: false,
+                Miembro: {
+                  borrado: false,
+                },
+              },
+            },
+            select: {
+              id: true,
+              Relacion: {
+                select: {
+                  id: true,
+                  tipo: true,
+                },
+              },
+              Responsable: {
+                select: {
+                  id: true,
+                  Miembro: {
+                    select: {
+                      id: true,
+                      nombre: true,
+                      apellidos: true,
+                      dni: true,
+                      telefono: true,
+                      email: true,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+      miembro.Responsable
+        ? this.prisma.responsabilidad.findMany({
+            where: {
+              borrado: false,
+              id_responsable: miembro.Responsable.id,
+              Protagonista: {
+                borrado: false,
+                Miembro: {
+                  borrado: false,
+                },
+              },
+            },
+            select: {
+              id: true,
+              Relacion: {
+                select: {
+                  id: true,
+                  tipo: true,
+                },
+              },
+              Protagonista: {
+                select: {
+                  id: true,
+                  Miembro: {
+                    select: {
+                      id: true,
+                      nombre: true,
+                      apellidos: true,
+                      dni: true,
+                      MiembroRama: {
+                        where: {
+                          borrado: false,
+                          fecha_egreso: null,
+                        },
+                        orderBy: {
+                          fecha_ingreso: 'desc',
+                        },
+                        take: 1,
+                        select: {
+                          Rama: {
+                            select: {
+                              id: true,
+                              nombre: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
     return {
-      responsables: miembro.Protagonista?.Responsabilidad ?? [],
-      protagonistas: miembro.Responsable?.Responsabilidad ?? [],
+      responsables,
+      protagonistas,
     };
   }
 
@@ -415,27 +426,112 @@ export class PerfilesService {
           id_cuenta: user.userId,
         },
         {
-          Protagonista: {
-            is: this.mergeSubtypeWhere(
-              { borrado: false },
-              this.scopeFilterService.forProtagonistas(user),
-            ),
+          Adulto: {
+            is: {
+              borrado: false,
+            },
           },
         },
         {
-          Adulto: {
-            is: this.mergeSubtypeWhere(
-              { borrado: false },
-              this.scopeFilterService.forAdultos(user),
-            ),
+          Protagonista: {
+            is: {
+              borrado: false,
+              Miembro: {
+                MiembroRama: {
+                  some: {
+                    borrado: false,
+                    fecha_egreso: null,
+                    ...(user.memberId
+                      ? {
+                          Rama: {
+                            EquipoArea: {
+                              some: {
+                                borrado: false,
+                                activo: true,
+                                fecha_fin: null,
+                                Adulto: {
+                                  borrado: false,
+                                  activo: true,
+                                  Miembro: {
+                                    id: user.memberId,
+                                    borrado: false,
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        }
+                      : { id_rama: -1 }),
+                  },
+                },
+              },
+            },
           },
         },
         {
           Responsable: {
-            is: this.mergeSubtypeWhere(
-              { borrado: false },
-              this.scopeFilterService.forResponsables(user),
-            ),
+            is: {
+              borrado: false,
+              OR: [
+                {
+                  Responsabilidad: {
+                    some: {
+                      borrado: false,
+                      Protagonista: {
+                        borrado: false,
+                        Miembro: {
+                          MiembroRama: {
+                            some: {
+                              borrado: false,
+                              fecha_egreso: null,
+                              ...(user.memberId
+                                ? {
+                                    Rama: {
+                                      EquipoArea: {
+                                        some: {
+                                          borrado: false,
+                                          activo: true,
+                                          fecha_fin: null,
+                                          Adulto: {
+                                            borrado: false,
+                                            activo: true,
+                                            Miembro: {
+                                              id: user.memberId,
+                                              borrado: false,
+                                            },
+                                          },
+                                        },
+                                      },
+                                    },
+                                  }
+                                : { id_rama: -1 }),
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                ...(user.memberId
+                  ? [
+                      {
+                        Responsabilidad: {
+                          some: {
+                            borrado: false,
+                            Protagonista: {
+                              borrado: false,
+                              Miembro: {
+                                id: user.memberId,
+                                borrado: false,
+                              },
+                            },
+                          },
+                        },
+                      } satisfies Prisma.ResponsableWhereInput,
+                    ]
+                  : []),
+              ],
+            },
           },
         },
       ],
@@ -457,18 +553,5 @@ export class PerfilesService {
         scope.scopeType === SCOPE.GRUPO ||
         scope.scopeType === SCOPE.OWN,
     );
-  }
-
-  private mergeSubtypeWhere<TWhere extends object>(
-    baseWhere: TWhere,
-    scopeWhere: TWhere | Record<string, never>,
-  ): TWhere {
-    if (Object.keys(scopeWhere).length === 0) {
-      return baseWhere;
-    }
-
-    return {
-      AND: [baseWhere, scopeWhere],
-    } as TWhere;
   }
 }
