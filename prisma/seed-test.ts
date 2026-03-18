@@ -34,19 +34,25 @@ const AREA_STAFF_CONFIG = [
     areaName: 'Jefatura',
     positionName: 'Jefe',
     roleName: 'JEFATURA',
-    scopeType: SCOPE.GLOBAL,
+    scopeType: SCOPE.GRUPO,
+  },
+  {
+    areaName: 'Jefatura',
+    positionName: 'Ayudante',
+    roleName: 'AYUDANTE',
+    scopeType: SCOPE.GRUPO,
   },
   {
     areaName: 'Secretaria y Tesoreria',
     positionName: 'Secretario',
     roleName: 'SECRETARIA_TESORERIA',
-    scopeType: SCOPE.AREA,
+    scopeType: SCOPE.GRUPO,
   },
   {
     areaName: 'Intendencia',
     positionName: 'Jefe',
     roleName: 'INTENDENCIA',
-    scopeType: SCOPE.AREA,
+    scopeType: SCOPE.GRUPO,
   },
 ] as const;
 
@@ -121,64 +127,66 @@ async function loadLookups(tx: Prisma.TransactionClient): Promise<SeedLookups> {
     ]),
   );
 
-  const [areas, ramas, positions, roles, relaciones] = await Promise.all([
-    tx.area.findMany({
-      where: {
-        nombre: {
-          in: areaNames,
-        },
+  const areas = await tx.area.findMany({
+    where: {
+      nombre: {
+        in: areaNames,
       },
-      select: {
-        id: true,
-        nombre: true,
+    },
+    select: {
+      id: true,
+      nombre: true,
+    },
+  });
+
+  const ramas = await tx.rama.findMany({
+    select: {
+      id: true,
+      nombre: true,
+      edad_minima_protagonistas: true,
+      edad_maxima_protagonistas: true,
+      edad_minima_adulto: true,
+    },
+    orderBy: {
+      id: 'asc',
+    },
+  });
+
+  const positions = await tx.posicionArea.findMany({
+    where: {
+      nombre: {
+        in: positionNames,
       },
-    }),
-    tx.rama.findMany({
-      select: {
-        id: true,
-        nombre: true,
-        edad_minima_protagonistas: true,
-        edad_maxima_protagonistas: true,
-        edad_minima_adulto: true,
+    },
+    select: {
+      id: true,
+      nombre: true,
+    },
+  });
+
+  const roles = await tx.role.findMany({
+    where: {
+      nombre: {
+        in: roleNames,
       },
-      orderBy: {
-        id: 'asc',
+    },
+    select: {
+      id: true,
+      nombre: true,
+    },
+  });
+
+  const relaciones = await tx.relacion.findMany({
+    where: {
+      tipo: {
+        in: ['Madre', 'Padre'],
       },
-    }),
-    tx.posicionArea.findMany({
-      where: {
-        nombre: {
-          in: positionNames,
-        },
-      },
-      select: {
-        id: true,
-        nombre: true,
-      },
-    }),
-    tx.role.findMany({
-      where: {
-        nombre: {
-          in: roleNames,
-        },
-      },
-      select: {
-        id: true,
-        nombre: true,
-      },
-    }),
-    tx.relacion.findMany({
-      where: {
-        tipo: {
-          in: ['Madre', 'Padre'],
-        },
-      },
-      select: {
-        id: true,
-        tipo: true,
-      },
-    }),
-  ]);
+    },
+    select: {
+      id: true,
+      tipo: true,
+    },
+  });
 
   const areaMap = new Map<string, LookupEntity>(
     areas.map((area) => [area.nombre, area]),
@@ -249,9 +257,42 @@ async function ensureCuentaYMiembro(
   cuentaId: number;
   miembroId: number;
 }> {
-  let cuenta = await tx.cuenta.findUnique({
+  const cuentaByUser = await tx.cuenta.findUnique({
     where: { user: input.user },
   });
+
+  let miembro = await tx.miembro.findUnique({
+    where: { dni: input.dni },
+  });
+
+  let cuenta = cuentaByUser;
+
+  if (miembro) {
+    const cuentaVinculada = await tx.cuenta.findUnique({
+      where: { id: miembro.id_cuenta },
+    });
+
+    if (!cuentaVinculada) {
+      throw new Error(
+        `El miembro con DNI ${input.dni} no tiene una cuenta valida asociada.`,
+      );
+    }
+
+    if (cuentaByUser && cuentaByUser.id !== cuentaVinculada.id) {
+      throw new Error(
+        `El user ${input.user} ya existe vinculado a otra cuenta distinta al DNI ${input.dni}. Ajusta los datos antes de reintentar el seed-test.`,
+      );
+    }
+
+    cuenta = await tx.cuenta.update({
+      where: { id: cuentaVinculada.id },
+      data: {
+        user: input.user,
+        password: passwordHash,
+        borrado: false,
+      },
+    });
+  }
 
   if (!cuenta) {
     cuenta = await tx.cuenta.create({
@@ -261,10 +302,6 @@ async function ensureCuentaYMiembro(
       },
     });
   }
-
-  let miembro = await tx.miembro.findUnique({
-    where: { dni: input.dni },
-  });
 
   if (!miembro) {
     miembro = await tx.miembro.create({
@@ -281,12 +318,6 @@ async function ensureCuentaYMiembro(
       },
     });
   } else {
-    if (miembro.id_cuenta !== cuenta.id) {
-      throw new Error(
-        `El DNI ${input.dni} ya existe vinculado a otra cuenta. Ajusta los datos antes de reintentar el seed-test.`,
-      );
-    }
-
     miembro = await tx.miembro.update({
       where: { id: miembro.id },
       data: {
@@ -297,6 +328,8 @@ async function ensureCuentaYMiembro(
         email: input.email,
         telefono: input.telefono,
         telefono_emergencia: input.telefonoEmergencia,
+        id_cuenta: cuenta.id,
+        borrado: false,
       },
     });
   }
@@ -501,6 +534,156 @@ async function ensurePago(
   });
 }
 
+async function ensureEvento(
+  tx: Prisma.TransactionClient,
+  input: {
+    nombre: string;
+    descripcion: string;
+    fechaInicio: Date;
+    fechaFin: Date;
+    lugar: string;
+    terminado: boolean;
+    costoMp?: Prisma.Decimal;
+    costoMa?: Prisma.Decimal;
+    costoAyudante?: Prisma.Decimal;
+    tipoId: number;
+    areaIds: number[];
+    ramaIds: number[];
+    miembroIds: number[];
+  },
+): Promise<void> {
+  const existing = await tx.evento.findFirst({
+    where: {
+      nombre: input.nombre,
+      borrado: false,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  const data = {
+    nombre: input.nombre,
+    descripcion: input.descripcion,
+    fecha_inicio: input.fechaInicio,
+    fecha_fin: input.fechaFin,
+    lugar: input.lugar,
+    terminado: input.terminado,
+    costo_mp: input.costoMp ?? new Prisma.Decimal(0),
+    costo_ma: input.costoMa ?? new Prisma.Decimal(0),
+    costo_ayudante: input.costoAyudante ?? new Prisma.Decimal(0),
+    id_tipo: input.tipoId,
+    borrado: false,
+  };
+
+  const eventoId = existing
+    ? (
+        await tx.evento.update({
+          where: { id: existing.id },
+          data,
+          select: { id: true },
+        })
+      ).id
+    : (
+        await tx.evento.create({
+          data,
+          select: { id: true },
+        })
+      ).id;
+
+  await tx.areaAfectada.deleteMany({
+    where: {
+      id_evento: eventoId,
+    },
+  });
+
+  if (input.areaIds.length > 0) {
+    await tx.areaAfectada.createMany({
+      data: input.areaIds.map((areaId) => ({
+        id_evento: eventoId,
+        id_area: areaId,
+      })),
+    });
+  }
+
+  await tx.ramaAfectada.updateMany({
+    where: {
+      id_evento: eventoId,
+    },
+    data: {
+      borrado: true,
+    },
+  });
+
+  if (input.ramaIds.length > 0) {
+    await tx.ramaAfectada.createMany({
+      data: input.ramaIds.map((ramaId) => ({
+        id_evento: eventoId,
+        id_rama: ramaId,
+      })),
+    });
+  }
+
+  await tx.inscripcionEvento.updateMany({
+    where: {
+      id_evento: eventoId,
+    },
+    data: {
+      borrado: true,
+    },
+  });
+
+  if (input.miembroIds.length > 0) {
+    await tx.inscripcionEvento.createMany({
+      data: input.miembroIds.map((miembroId) => ({
+        id_evento: eventoId,
+        id_miembro: miembroId,
+        descripcion: `Inscripcion de prueba para ${input.nombre}`,
+        monto_total: new Prisma.Decimal(0),
+        saldo_pendiente: new Prisma.Decimal(0),
+      })),
+    });
+  }
+}
+
+async function ensureComision(
+  tx: Prisma.TransactionClient,
+  input: {
+    nombre: string;
+    descripcion: string;
+    eventoId: number;
+  },
+): Promise<void> {
+  const existing = await tx.comision.findFirst({
+    where: {
+      nombre: input.nombre,
+      id_evento: input.eventoId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (existing) {
+    await tx.comision.update({
+      where: { id: existing.id },
+      data: {
+        descripcion: input.descripcion,
+        borrado: false,
+      },
+    });
+    return;
+  }
+
+  await tx.comision.create({
+    data: {
+      nombre: input.nombre,
+      descripcion: input.descripcion,
+      id_evento: input.eventoId,
+    },
+  });
+}
+
 async function ensureAsignacionApf(
   tx: Prisma.TransactionClient,
   adultoId: number,
@@ -527,6 +710,47 @@ async function ensureAsignacionApf(
       id_adulto: adultoId,
       id_consejo: consejoId,
       observacion,
+    },
+  });
+}
+
+async function ensureTemarioConsejo(
+  tx: Prisma.TransactionClient,
+  input: {
+    consejoId: number;
+    titulo: string;
+    descripcion: string;
+    sinMp: boolean;
+  },
+): Promise<void> {
+  const existing = await tx.temarioConsejo.findFirst({
+    where: {
+      id_consejo: input.consejoId,
+      titulo: input.titulo,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (existing) {
+    await tx.temarioConsejo.update({
+      where: { id: existing.id },
+      data: {
+        descripcion: input.descripcion,
+        sin_mp: input.sinMp,
+        borrado: false,
+      },
+    });
+    return;
+  }
+
+  await tx.temarioConsejo.create({
+    data: {
+      id_consejo: input.consejoId,
+      titulo: input.titulo,
+      descripcion: input.descripcion,
+      sin_mp: input.sinMp,
     },
   });
 }
@@ -771,18 +995,19 @@ async function seedAdultosDeArea(
     }
 
     const areaSlug = slugify(staff.areaName);
+    const positionSlug = slugify(staff.positionName);
 
     const { cuentaId, miembroId } = await ensureCuentaYMiembro(
       tx,
       passwordHash,
       {
-        user: `test.area.${areaSlug}`,
+        user: `test.area.${areaSlug}.${positionSlug}`,
         dni: `${dniSequence}`,
         nombre: staff.positionName,
         apellidos: staff.areaName,
         fechaNacimiento: buildBirthDate(35, 7, 15),
         direccion: `Sede ${staff.areaName}`,
-        email: `test.area.${areaSlug}@sas.local`,
+        email: `test.area.${areaSlug}.${positionSlug}@sas.local`,
         telefono: `54024000${dniSequence}`,
         telefonoEmergencia: `54025000${dniSequence}`,
       },
@@ -801,8 +1026,7 @@ async function seedAdultosDeArea(
         );
       }
 
-      const scopeId = staff.scopeType === SCOPE.AREA ? area.id : null;
-      await ensureCuentaRole(tx, cuentaId, role.id, staff.scopeType, scopeId);
+      await ensureCuentaRole(tx, cuentaId, role.id, staff.scopeType, null);
     }
 
     await ensureCuentaDineroMiembro(
@@ -964,45 +1188,45 @@ async function seedPagosProtagonistasPorRama(
   console.log('Creando pagos de prueba para protagonistas...');
 
   const fechaPago = new Date('2026-02-25T00:00:00.000Z');
-  const [cuentaGrupo, metodoTransferencia, conceptoAfiliacion, conceptoCuota] =
-    await Promise.all([
-      tx.cuentaDinero.findFirst({
-        where: {
-          nombre: 'Caja General Grupo',
-          borrado: false,
-        },
-        select: {
-          id: true,
-        },
-      }),
-      tx.metodoPago.findFirst({
-        where: {
-          nombre: 'Transferencia',
-          borrado: false,
-        },
-        select: {
-          id: true,
-        },
-      }),
-      tx.conceptoPago.findFirst({
-        where: {
-          nombre: 'Afiliacion',
-          borrado: false,
-        },
-        select: {
-          id: true,
-        },
-      }),
-      tx.conceptoPago.findFirst({
-        where: {
-          nombre: 'Cuota',
-          borrado: false,
-        },
-        select: {
-          id: true,
-        },
-      }),
-    ]);
+  const cuentaGrupo = await tx.cuentaDinero.findFirst({
+    where: {
+      nombre: 'Caja General Grupo',
+      borrado: false,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  const metodoTransferencia = await tx.metodoPago.findFirst({
+    where: {
+      nombre: 'Transferencia',
+      borrado: false,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  const conceptoAfiliacion = await tx.conceptoPago.findFirst({
+    where: {
+      nombre: 'Afiliacion',
+      borrado: false,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  const conceptoCuota = await tx.conceptoPago.findFirst({
+    where: {
+      nombre: 'Cuota',
+      borrado: false,
+    },
+    select: {
+      id: true,
+    },
+  });
 
   if (!cuentaGrupo || !metodoTransferencia || !conceptoAfiliacion || !conceptoCuota) {
     throw new Error(
@@ -1077,13 +1301,213 @@ async function seedPagosProtagonistasPorRama(
   }
 }
 
+async function seedEventosDePrueba(
+  tx: Prisma.TransactionClient,
+  lookups: SeedLookups,
+): Promise<void> {
+  console.log('Creando eventos de prueba...');
+
+  const campamentoTipo = await tx.tipoEvento.findFirst({
+    where: {
+      nombre: 'Campamento',
+      borrado: false,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  const descubiertaTipo = await tx.tipoEvento.findFirst({
+    where: {
+      nombre: 'Descubierta',
+      borrado: false,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!campamentoTipo || !descubiertaTipo) {
+    throw new Error(
+      'Faltan tipos de evento base para sembrar eventos de prueba. Ejecuta primero el seed base.',
+    );
+  }
+
+  const allAreaIds = Array.from(lookups.areas.values()).map((area) => area.id);
+  const allRamas = Array.from(lookups.ramas.values());
+  const allRamaIds = allRamas.map((rama) => rama.id);
+
+  const adultos = await tx.adulto.findMany({
+    where: {
+      borrado: false,
+      activo: true,
+      Miembro: {
+        borrado: false,
+      },
+    },
+    select: {
+      Miembro: {
+        select: {
+          id: true,
+        },
+      },
+    },
+  });
+
+  const protagonistas = await tx.protagonista.findMany({
+    where: {
+      borrado: false,
+      activo: true,
+      Miembro: {
+        borrado: false,
+      },
+    },
+    orderBy: {
+      id: 'asc',
+    },
+    select: {
+      Miembro: {
+        select: {
+          id: true,
+          MiembroRama: {
+            where: {
+              borrado: false,
+              fecha_egreso: null,
+            },
+            take: 1,
+            select: {
+              id_rama: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const protagonistasPorRama = new Map<number, number[]>();
+
+  for (const protagonista of protagonistas) {
+    const ramaId = protagonista.Miembro.MiembroRama[0]?.id_rama;
+
+    if (!ramaId) {
+      continue;
+    }
+
+    const rows = protagonistasPorRama.get(ramaId) ?? [];
+    rows.push(protagonista.Miembro.id);
+    protagonistasPorRama.set(ramaId, rows);
+  }
+
+  await ensureEvento(tx, {
+    nombre: 'Campamento de verano',
+    descripcion: 'Campamento general de verano con participación de todas las ramas y áreas.',
+    fechaInicio: new Date('2026-01-12T08:00:00.000Z'),
+    fechaFin: new Date('2026-01-18T18:00:00.000Z'),
+    lugar: 'Predio Scout de Verano',
+    terminado: false,
+    tipoId: campamentoTipo.id,
+    areaIds: allAreaIds,
+    ramaIds: allRamaIds,
+    miembroIds: adultos.map((adulto) => adulto.Miembro.id),
+  });
+
+  await ensureEvento(tx, {
+    nombre: 'Campamento de invierno',
+    descripcion: 'Campamento general de invierno con participación parcial de protagonistas por rama.',
+    fechaInicio: new Date('2026-07-17T08:00:00.000Z'),
+    fechaFin: new Date('2026-07-19T18:00:00.000Z'),
+    lugar: 'Predio Scout de Invierno',
+    terminado: false,
+    tipoId: campamentoTipo.id,
+    areaIds: allAreaIds,
+    ramaIds: allRamaIds,
+    miembroIds: allRamas.flatMap((rama) =>
+      (protagonistasPorRama.get(rama.id) ?? []).slice(0, 2),
+    ),
+  });
+
+  const areaRama = lookups.areas.get('Rama');
+  if (!areaRama) {
+    throw new Error(
+      'Falta el área Rama para sembrar descubiertas. Ejecuta primero el seed base.',
+    );
+  }
+
+  for (const rama of allRamas) {
+    await ensureEvento(tx, {
+      nombre: `Descubierta ${rama.nombre}`,
+      descripcion: `Descubierta de prueba para la rama ${rama.nombre}.`,
+      fechaInicio: new Date('2026-09-12T09:00:00.000Z'),
+      fechaFin: new Date('2026-09-12T19:00:00.000Z'),
+      lugar: `Punto de salida ${rama.nombre}`,
+      terminado: false,
+      tipoId: descubiertaTipo.id,
+      areaIds: [areaRama.id],
+      ramaIds: [rama.id],
+      miembroIds: (protagonistasPorRama.get(rama.id) ?? []).slice(0, 3),
+    });
+  }
+}
+
+async function seedComisionesDePrueba(
+  tx: Prisma.TransactionClient,
+): Promise<void> {
+  console.log('Creando comisiones de prueba...');
+
+  const summerEvent = await tx.evento.findFirst({
+    where: {
+      nombre: 'Campamento de verano',
+      borrado: false,
+    },
+    select: {
+      id: true,
+      nombre: true,
+    },
+  });
+
+  const winterEvent = await tx.evento.findFirst({
+    where: {
+      nombre: 'Campamento de invierno',
+      borrado: false,
+    },
+    select: {
+      id: true,
+      nombre: true,
+    },
+  });
+
+  if (!summerEvent || !winterEvent) {
+    throw new Error(
+      'Faltan los campamentos base para sembrar comisiones de prueba.',
+    );
+  }
+
+  const baseCommissions = [
+    'Cocina',
+    'Intendencia',
+    'Programa',
+    'Gran Juego',
+    'Fogon',
+  ] as const;
+
+  for (const event of [summerEvent, winterEvent]) {
+    for (const commissionName of baseCommissions) {
+      await ensureComision(tx, {
+        nombre: `${commissionName} ${event.nombre}`,
+        descripcion: `Comision de ${commissionName.toLowerCase()} para ${event.nombre.toLowerCase()}.`,
+        eventoId: event.id,
+      });
+    }
+  }
+}
+
 async function seedApfsIniciales(
   tx: Prisma.TransactionClient,
   lookups: SeedLookups,
 ): Promise<void> {
   console.log('Habilitando APFs iniciales de prueba...');
 
-  const consejo = await tx.consejo.findFirst({
+  let consejo = await tx.consejo.findFirst({
     where: {
       borrado: false,
     },
@@ -1096,9 +1520,18 @@ async function seedApfsIniciales(
   });
 
   if (!consejo) {
-    throw new Error(
-      'No hay consejos cargados para habilitar APFs. Ejecuta primero el seed base.',
-    );
+    consejo = await tx.consejo.create({
+      data: {
+        nombre: 'Consejo de prueba para APFs',
+        descripcion:
+          'Consejo creado automaticamente por seed-test para habilitar APFs iniciales.',
+        fecha: new Date('2026-03-01T19:00:00.000Z'),
+        es_ordinario: true,
+      },
+      select: {
+        id: true,
+      },
+    });
   }
 
   const jefaturaRole = lookups.roles.get('JEFATURA');
@@ -1146,6 +1579,43 @@ async function seedApfsIniciales(
       `APF inicial de prueba para ${adult.Miembro.nombre} ${adult.Miembro.apellidos}`.trim(),
     );
   }
+
+  const temasConsejo = [
+    {
+      titulo: 'Apertura del consejo',
+      descripcion: 'Repaso inicial y organizacion general del consejo.',
+      sinMp: false,
+    },
+    {
+      titulo: 'Programacion de actividades',
+      descripcion: 'Definicion de proximas actividades y responsables.',
+      sinMp: false,
+    },
+    {
+      titulo: 'Evaluacion del campamento',
+      descripcion: 'Balance general del ultimo campamento realizado.',
+      sinMp: false,
+    },
+    {
+      titulo: 'Situacion particular de protagonistas',
+      descripcion: 'Tema reservado para el equipo adulto.',
+      sinMp: true,
+    },
+    {
+      titulo: 'Seguimiento de responsables',
+      descripcion: 'Tema reservado sobre acompanamiento familiar.',
+      sinMp: true,
+    },
+  ] as const;
+
+  for (const tema of temasConsejo) {
+    await ensureTemarioConsejo(tx, {
+      consejoId: consejo.id,
+      titulo: tema.titulo,
+      descripcion: tema.descripcion,
+      sinMp: tema.sinMp,
+    });
+  }
 }
 
 async function main() {
@@ -1161,6 +1631,8 @@ async function main() {
     await seedAdultosDeArea(tx, lookups, passwordHash);
     await seedResponsablesPorRama(tx, lookups, passwordHash);
     await seedPagosProtagonistasPorRama(tx);
+    await seedEventosDePrueba(tx, lookups);
+    await seedComisionesDePrueba(tx);
     await seedApfsIniciales(tx, lookups);
   });
 

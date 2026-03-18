@@ -7,7 +7,6 @@ import {
 import { SCOPE } from '@prisma/client';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
-import { BYPASS_ROLES } from '../decorators/roles.decorator';
 import {
   SCOPES_KEY,
   ScopeAwareRequest,
@@ -15,8 +14,9 @@ import {
 } from '../decorators/scopes.decorator';
 import {
   AuthenticatedRequest,
-  AuthenticatedScope,
+  AuthenticatedUser,
 } from '../types/auth-request.types';
+import { hasUnrestrictedAccess } from '../utils/unrestricted-access.util';
 
 interface RequestContainer {
   [key: string]: unknown;
@@ -54,7 +54,7 @@ export class ScopesGuard implements CanActivate {
       );
     }
 
-    if (this.hasBypassAccess(user.roles, user.scopes)) {
+    if (this.hasBypassAccess(user)) {
       return true;
     }
 
@@ -98,20 +98,8 @@ export class ScopesGuard implements CanActivate {
     );
   }
 
-  private hasBypassAccess(
-    roles: string[],
-    scopes: AuthenticatedScope[],
-  ): boolean {
-    if (BYPASS_ROLES.some((role) => roles.includes(role))) {
-      return true;
-    }
-
-    return scopes.some(
-      (scope) =>
-        scope.scopeType === SCOPE.GLOBAL ||
-        scope.scopeType === SCOPE.GRUPO ||
-        scope.scopeType === SCOPE.OWN,
-    );
+  private hasBypassAccess(user: AuthenticatedUser): boolean {
+    return hasUnrestrictedAccess(user);
   }
 
   private readValueFromRequest(

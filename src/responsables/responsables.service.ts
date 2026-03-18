@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, SCOPE } from '@prisma/client';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import { CuentasService } from '../cuentas/cuentas.service';
@@ -191,6 +191,7 @@ export class ResponsablesService {
   async create(dto: CreateResponsableDto, user: AuthenticatedUser) {
     const created = await this.prisma.$transaction(async (tx) => {
       const account = await this.cuentasService.createCuentaConMiembro(tx, dto);
+      const responsableRole = await this.ensureResponsableRole(tx);
 
       await tx.responsable.create({
         data: {
@@ -203,6 +204,12 @@ export class ResponsablesService {
         account.miembroId,
         dto.nombre,
         dto.apellidos,
+      );
+      await this.syncResponsableRoleAssignment(
+        tx,
+        account.cuentaId,
+        responsableRole.id,
+        null,
       );
 
       return account;
@@ -238,6 +245,7 @@ export class ResponsablesService {
     const relacionId = await this.getDefaultRelacionId();
 
     await this.prisma.$transaction(async (tx) => {
+      const responsableRole = await this.ensureResponsableRole(tx);
       await tx.responsabilidad.updateMany({
         where: {
           id_responsable: responsable.id,
@@ -293,6 +301,13 @@ export class ResponsablesService {
           });
         }
       }
+
+      await this.syncResponsableRoleAssignment(
+        tx,
+        responsable.Miembro.Cuenta.id,
+        responsableRole.id,
+        responsable.id,
+      );
     });
 
     return this.findOne(id, user);
@@ -302,6 +317,7 @@ export class ResponsablesService {
     const responsable = await this.ensureResponsableAccessible(id, user);
 
     await this.prisma.$transaction(async (tx) => {
+      const responsableRole = await this.ensureResponsableRole(tx);
       await tx.responsabilidad.updateMany({
         where: {
           id_responsable: responsable.id,
@@ -330,6 +346,13 @@ export class ResponsablesService {
         where: { id: responsable.Miembro.Cuenta.id },
         data: {
           borrado: true,
+        },
+      });
+
+      await tx.cuentaRole.deleteMany({
+        where: {
+          id_cuenta: responsable.Miembro.Cuenta.id,
+          id_role: responsableRole.id,
         },
       });
     });
@@ -488,6 +511,113 @@ export class ResponsablesService {
     await tx.cuentaDinero.create({
       data,
     });
+  }
+
+  private async ensureResponsableRole(tx: Prisma.TransactionClient) {
+    const role = await tx.role.findUnique({
+      where: {
+        nombre: 'RESPONSABLE',
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!role) {
+      throw new NotFoundException(
+        'El rol RESPONSABLE no existe. Ejecuta el seed base para crearlo.',
+      );
+    }
+
+    return role;
+  }
+
+  private async syncResponsableRoleAssignment(
+    tx: Prisma.TransactionClient,
+    cuentaId: number,
+    roleId: number,
+    responsableId: number | null,
+  ) {
+    let scopeType: SCOPE = SCOPE.OWN;
+    let scopeId: number | null = null;
+
+    if (responsableId) {
+      const ramaIds = await this.getResponsableCurrentRamaIds(tx, responsableId);
+
+      if (ramaIds.length === 1) {
+        scopeType = SCOPE.RAMA;
+        scopeId = ramaIds[0];
+      }
+    }
+
+    await tx.cuentaRole.deleteMany({
+      where: {
+        id_cuenta: cuentaId,
+        id_role: roleId,
+      },
+    });
+
+    await tx.cuentaRole.create({
+      data: {
+        id_cuenta: cuentaId,
+        id_role: roleId,
+        tipo_scope: scopeType,
+        id_scope: scopeId,
+      },
+    });
+  }
+
+  private async getResponsableCurrentRamaIds(
+    tx: Prisma.TransactionClient,
+    responsableId: number,
+  ) {
+    const responsabilidades = await tx.responsabilidad.findMany({
+      where: {
+        id_responsable: responsableId,
+        borrado: false,
+        Protagonista: {
+          borrado: false,
+          Miembro: {
+            borrado: false,
+            MiembroRama: {
+              some: {
+                borrado: false,
+                fecha_egreso: null,
+              },
+            },
+          },
+        },
+      },
+      select: {
+        Protagonista: {
+          select: {
+            Miembro: {
+              select: {
+                MiembroRama: {
+                  where: {
+                    borrado: false,
+                    fecha_egreso: null,
+                  },
+                  select: {
+                    id_rama: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return [
+      ...new Set(
+        responsabilidades.flatMap((responsabilidad) =>
+          responsabilidad.Protagonista.Miembro.MiembroRama.map(
+            (miembroRama) => miembroRama.id_rama,
+          ),
+        ),
+      ),
+    ];
   }
 
   private responsableListSelect() {

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -160,6 +161,12 @@ export class ConsejosService {
     user: AuthenticatedUser,
     includePrivateTopics: boolean,
   ) {
+    if (includePrivateTopics && this.shouldHidePrivateTemario(user)) {
+      throw new ForbiddenException(
+        'El usuario no tiene acceso al PDF completo del consejo.',
+      );
+    }
+
     const allowPrivateTopics =
       includePrivateTopics && !this.shouldHidePrivateTemario(user);
     const consejo = await this.getConsejoExportData(
@@ -174,7 +181,7 @@ export class ConsejosService {
 
     return {
       filename: `${slug || 'consejo'}${
-        allowPrivateTopics ? '' : '-publico'
+        allowPrivateTopics ? '' : '-pdf'
       }.pdf`,
       buffer,
     };
@@ -1082,7 +1089,7 @@ export class ConsejosService {
       .font('Helvetica')
       .fontSize(11)
       .text(`Fecha: ${this.formatDate(consejo.fecha)}`)
-      .text(`Version: ${includePrivateTopics ? 'Completa' : 'Sin temas sin_mp'}`);
+      .text(`Version: ${includePrivateTopics ? 'Completa' : 'PDF'}`);
 
     if (consejo.descripcion) {
       doc

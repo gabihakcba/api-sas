@@ -1,8 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, SCOPE } from '@prisma/client';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
+import { hasUnrestrictedAccess } from '../auth/utils/unrestricted-access.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { UpdatePerfilFirmaDto } from './dto/update-perfil-firma.dto';
 
 @Injectable()
 export class PerfilesService {
@@ -372,6 +378,70 @@ export class PerfilesService {
     };
   }
 
+  async getFirma(id: number, user: AuthenticatedUser) {
+    await this.ensureOwnProfile(id, user);
+
+    const miembro = await this.prisma.miembro.findFirst({
+      where: {
+        id,
+        borrado: false,
+      },
+      select: {
+        id: true,
+        firma: true,
+      },
+    });
+
+    if (!miembro) {
+      throw new NotFoundException('El perfil indicado no existe.');
+    }
+
+    return {
+      firmaBase64: miembro.firma
+        ? `data:image/png;base64,${Buffer.from(miembro.firma).toString('base64')}`
+        : null,
+    };
+  }
+
+  async updateFirma(
+    id: number,
+    dto: UpdatePerfilFirmaDto,
+    user: AuthenticatedUser,
+  ) {
+    await this.ensureOwnProfile(id, user);
+
+    const miembro = await this.prisma.miembro.findFirst({
+      where: {
+        id,
+        borrado: false,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!miembro) {
+      throw new NotFoundException('El perfil indicado no existe.');
+    }
+
+    const firma = this.parseFirmaBase64(dto.firmaBase64 ?? null);
+
+    await this.prisma.miembro.update({
+      where: {
+        id: miembro.id,
+      },
+      data: {
+        firma,
+      },
+    });
+
+    return {
+      firmaBase64: firma
+        ? `data:image/png;base64,${Buffer.from(firma).toString('base64')}`
+        : null,
+    };
+  }
+
   private async resolveOwnMemberId(user: AuthenticatedUser) {
     const miembro = await this.prisma.miembro.findFirst({
       where: {
@@ -388,6 +458,16 @@ export class PerfilesService {
     }
 
     return miembro.id;
+  }
+
+  private async ensureOwnProfile(id: number, user: AuthenticatedUser) {
+    const ownMemberId = await this.resolveOwnMemberId(user);
+
+    if (ownMemberId !== id) {
+      throw new BadRequestException(
+        'Solo puedes consultar o modificar la firma de tu propio perfil.',
+      );
+    }
   }
 
   private async ensureVisibleMember(id: number, user: AuthenticatedUser) {
@@ -436,35 +516,57 @@ export class PerfilesService {
           Protagonista: {
             is: {
               borrado: false,
-              Miembro: {
-                MiembroRama: {
-                  some: {
-                    borrado: false,
-                    fecha_egreso: null,
-                    ...(user.memberId
-                      ? {
-                          Rama: {
-                            EquipoArea: {
-                              some: {
-                                borrado: false,
-                                activo: true,
-                                fecha_fin: null,
-                                Adulto: {
-                                  borrado: false,
-                                  activo: true,
-                                  Miembro: {
-                                    id: user.memberId,
+              OR: [
+                {
+                  Miembro: {
+                    MiembroRama: {
+                      some: {
+                        borrado: false,
+                        fecha_egreso: null,
+                        ...(user.memberId
+                          ? {
+                              Rama: {
+                                EquipoArea: {
+                                  some: {
                                     borrado: false,
+                                    activo: true,
+                                    fecha_fin: null,
+                                    Adulto: {
+                                      borrado: false,
+                                      activo: true,
+                                      Miembro: {
+                                        id: user.memberId,
+                                        borrado: false,
+                                      },
+                                    },
                                   },
                                 },
                               },
-                            },
-                          },
-                        }
-                      : { id_rama: -1 }),
+                            }
+                          : { id_rama: -1 }),
+                      },
+                    },
                   },
                 },
-              },
+                ...(user.roles.includes('RESPONSABLE')
+                  ? [
+                      {
+                        Responsabilidad: {
+                          some: {
+                            borrado: false,
+                            Responsable: {
+                              borrado: false,
+                              Miembro: {
+                                borrado: false,
+                                id_cuenta: user.userId,
+                              },
+                            },
+                          },
+                        },
+                      } satisfies Prisma.ProtagonistaWhereInput,
+                    ]
+                  : []),
+              ],
             },
           },
         },
@@ -530,6 +632,32 @@ export class PerfilesService {
                       } satisfies Prisma.ResponsableWhereInput,
                     ]
                   : []),
+                ...(user.roles.includes('RESPONSABLE')
+                  ? [
+                      {
+                        Responsabilidad: {
+                          some: {
+                            borrado: false,
+                            Protagonista: {
+                              borrado: false,
+                              Responsabilidad: {
+                                some: {
+                                  borrado: false,
+                                  Responsable: {
+                                    borrado: false,
+                                    Miembro: {
+                                      borrado: false,
+                                      id_cuenta: user.userId,
+                                    },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      } satisfies Prisma.ResponsableWhereInput,
+                    ]
+                  : []),
               ],
             },
           },
@@ -539,19 +667,24 @@ export class PerfilesService {
   }
 
   private hasUnrestrictedAccess(user: AuthenticatedUser): boolean {
-    if (user.roles.some((role) => role === 'ADM' || role === 'OWN')) {
-      return true;
+    return hasUnrestrictedAccess(user);
+  }
+
+  private parseFirmaBase64(firmaBase64: string | null) {
+    if (!firmaBase64) {
+      return null;
     }
 
-    if (user.roles.includes('JEFATURA')) {
-      return true;
-    }
+    const prefix = 'base64,';
+    const index = firmaBase64.indexOf(prefix);
+    const rawBase64 = index >= 0
+      ? firmaBase64.slice(index + prefix.length)
+      : firmaBase64;
 
-    return user.scopes.some(
-      (scope) =>
-        scope.scopeType === SCOPE.GLOBAL ||
-        scope.scopeType === SCOPE.GRUPO ||
-        scope.scopeType === SCOPE.OWN,
-    );
+    try {
+      return Buffer.from(rawBase64, 'base64');
+    } catch {
+      throw new BadRequestException('La firma enviada no tiene un formato válido.');
+    }
   }
 }

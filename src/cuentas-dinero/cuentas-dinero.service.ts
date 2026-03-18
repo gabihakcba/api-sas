@@ -8,6 +8,7 @@ import {
 import { Prisma, SCOPE } from '@prisma/client';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
+import { hasUnrestrictedAccess } from '../auth/utils/unrestricted-access.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { CuentasDineroQueryDto } from './dto/cuentas-dinero-query.dto';
 import { CreateCuentaDineroDto } from './dto/create-cuenta-dinero.dto';
@@ -590,12 +591,7 @@ export class CuentasDineroService {
     user: AuthenticatedUser,
     onlyMemberId?: number,
   ): Prisma.MiembroWhereInput {
-    if (
-      user.roles.includes('ADM') ||
-      user.roles.includes('OWN') ||
-      user.roles.includes('JEFATURA') ||
-      user.roles.includes('SECRETARIA_TESORERIA')
-    ) {
+    if (hasUnrestrictedAccess(user)) {
       return {
         borrado: false,
         ...(onlyMemberId ? { id: onlyMemberId } : {}),

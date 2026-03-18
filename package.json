@@ -8,6 +8,7 @@
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "seed:clear": "ts-node ./prisma/anti-seed.ts",
     "seed:test": "ts-node ./prisma/seed-test.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",

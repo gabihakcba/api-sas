@@ -29,6 +29,7 @@ import { UpdateEventoDto } from './dto/update-evento.dto';
 import { EventosService } from './eventos.service';
 
 const ADULT_ROLES = [
+  'AYUDANTE',
   'JEFATURA',
   'SECRETARIA_TESORERIA',
   'JEFATURA_RAMA',

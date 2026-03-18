@@ -26,6 +26,7 @@ import { UpdateComisionParticipantesDto } from './dto/update-comision-participan
 import { UpdateComisionDto } from './dto/update-comision.dto';
 
 const ADULT_ROLES = [
+  'AYUDANTE',
   'JEFATURA',
   'SECRETARIA_TESORERIA',
   'JEFATURA_RAMA',
@@ -40,8 +41,11 @@ export class ComisionesController {
   @Get()
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @CheckPermissions('READ:COMISION')
-  async findAll(@Query() query: ComisionesQueryDto) {
-    return this.comisionesService.findAll(query);
+  async findAll(
+    @Request() req: AuthenticatedRequest,
+    @Query() query: ComisionesQueryDto,
+  ) {
+    return this.comisionesService.findAll(req.user!, query);
   }
 
   @Get('options')
@@ -54,8 +58,11 @@ export class ComisionesController {
   @Get(':id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @CheckPermissions('READ:COMISION')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.comisionesService.findOne(id);
+  async findOne(
+    @Request() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.comisionesService.findOne(id, req.user!);
   }
 
   @Post()
@@ -81,8 +88,11 @@ export class ComisionesController {
   @Get(':id/participantes')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @CheckPermissions('READ:COMISION')
-  async getParticipantes(@Param('id', ParseIntPipe) id: number) {
-    return this.comisionesService.getParticipantes(id);
+  async getParticipantes(
+    @Request() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.comisionesService.getParticipantes(id, req.user!);
   }
 
   @Patch(':id/participantes')

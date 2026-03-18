@@ -6,9 +6,11 @@ import {
 } from '@nestjs/common';
 import {
   Prisma,
+  SCOPE,
   TIPO_COMPETENCIA_FORMACION,
 } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
+import { hasScopedRoleAccess } from '../auth/utils/unrestricted-access.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAdjuntoFormacionDto } from './dto/create-adjunto-formacion.dto';
 import { CreateAsignacionApfDto } from './dto/create-asignacion-apf.dto';
@@ -332,7 +334,7 @@ export class PlanFormacionService {
     const canCreatePlan = currentAdult !== null;
     const canManageApf =
       currentAdult !== null &&
-      (user.roles.includes('JEFATURA') ||
+      (hasScopedRoleAccess(user, 'JEFATURA', [SCOPE.GRUPO, SCOPE.GLOBAL]) ||
         (await this.hasActiveApfAssignment(currentAdult.id)));
 
     const [templates, areas, apfs, adultos, consejos] = await this.prisma.$transaction([
@@ -1297,7 +1299,7 @@ export class PlanFormacionService {
   private async ensureCanManageApf(user: AuthenticatedUser) {
     const adultoActual = await this.resolveAdultFromMemberId(user.memberId);
 
-    if (user.roles.includes('JEFATURA')) {
+    if (hasScopedRoleAccess(user, 'JEFATURA', [SCOPE.GRUPO, SCOPE.GLOBAL])) {
       return adultoActual;
     }
 

@@ -27,7 +27,7 @@ export class AdultosService {
     const skip = (page - 1) * limit;
     const searchTerm = paginationQuery.q?.trim();
 
-    const scopeWhere = this.scopeFilterService.forAdultos(user);
+    const scopeWhere = await this.getAdultScopeWhere(user);
     const where = this.scopeFilterService.mergeWhere(
       {
         borrado: false,
@@ -284,7 +284,7 @@ export class AdultosService {
             borrado: false,
           },
         },
-        this.scopeFilterService.forAdultos(user),
+        await this.getAdultScopeWhere(user),
       ),
       select: {
         id: true,
@@ -384,7 +384,7 @@ export class AdultosService {
             borrado: false,
           },
         },
-        this.scopeFilterService.forAdultos(user),
+        await this.getAdultScopeWhere(user),
       ),
       select: {
         id: true,
@@ -633,6 +633,102 @@ export class AdultosService {
             : null,
       };
     });
+  }
+
+  private async getAdultScopeWhere(user: AuthenticatedUser) {
+    const baseScopeWhere = this.scopeFilterService.forAdultos(user);
+
+    if (user.roles.includes('RESPONSABLE')) {
+      const ramaIds = await this.getResponsableRamaIds(user);
+
+      return {
+        OR: [
+          {
+            EquipoArea: {
+              some: {
+                borrado: false,
+                activo: true,
+                fecha_fin: null,
+                Area: {
+                  borrado: false,
+                  nombre: 'Jefatura',
+                },
+              },
+            },
+          },
+          ...(ramaIds.length > 0
+            ? [
+                {
+                  EquipoArea: {
+                    some: {
+                      borrado: false,
+                      activo: true,
+                      fecha_fin: null,
+                      id_rama: {
+                        in: ramaIds,
+                      },
+                    },
+                  },
+                } satisfies Prisma.AdultoWhereInput,
+              ]
+            : []),
+        ],
+      };
+    }
+
+    return baseScopeWhere;
+  }
+
+  private async getResponsableRamaIds(user: AuthenticatedUser) {
+    const relaciones = await this.prisma.responsabilidad.findMany({
+      where: {
+        borrado: false,
+        Responsable: {
+          borrado: false,
+          Miembro: {
+            borrado: false,
+            id_cuenta: user.userId,
+          },
+        },
+        Protagonista: {
+          borrado: false,
+          Miembro: {
+            borrado: false,
+            MiembroRama: {
+              some: {
+                borrado: false,
+                fecha_egreso: null,
+              },
+            },
+          },
+        },
+      },
+      select: {
+        Protagonista: {
+          select: {
+            Miembro: {
+              select: {
+                MiembroRama: {
+                  where: {
+                    borrado: false,
+                    fecha_egreso: null,
+                  },
+                  select: {
+                    id_rama: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return [...new Set(
+      relaciones.flatMap((relacion) =>
+        relacion.Protagonista.Miembro.MiembroRama.map((rama) => rama.id_rama),
+      ),
+    )];
   }
 
   async update(id: number, dto: UpdateAdultoDto, user: AuthenticatedUser) {
@@ -1118,17 +1214,18 @@ export class AdultosService {
       scopeType = SCOPE.RAMA;
       scopeId = assignment.ramaId;
     } else if (assignment.areaNombre === 'Jefatura') {
-      roleName = 'JEFATURA';
-      scopeType = SCOPE.GLOBAL;
+      roleName =
+        assignment.posicionNombre === 'Ayudante' ? 'AYUDANTE' : 'JEFATURA';
+      scopeType = SCOPE.GRUPO;
       scopeId = null;
     } else if (assignment.areaNombre === 'Secretaria y Tesoreria') {
       roleName = 'SECRETARIA_TESORERIA';
-      scopeType = SCOPE.AREA;
-      scopeId = assignment.areaId;
+      scopeType = SCOPE.GRUPO;
+      scopeId = null;
     } else if (assignment.areaNombre === 'Intendencia') {
       roleName = 'INTENDENCIA';
-      scopeType = SCOPE.AREA;
-      scopeId = assignment.areaId;
+      scopeType = SCOPE.GRUPO;
+      scopeId = null;
     }
 
     if (!roleName) {

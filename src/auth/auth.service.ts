@@ -21,6 +21,7 @@ export interface UserPayload {
 }
 
 const ADULT_MEMBER_ROLES = new Set([
+  'AYUDANTE',
   'JEFATURA',
   'SECRETARIA_TESORERIA',
   'JEFATURA_RAMA',
@@ -120,17 +121,7 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const rolesSet = new Set(account.CuentaRole.map((cr) => cr.Role.nombre));
-
-    if (account.Miembro?.Protagonista?.borrado === false) {
-      rolesSet.add('PROTAGONISTA');
-    }
-
-    if (account.Miembro?.Responsable?.borrado === false) {
-      rolesSet.add('RESPONSABLE');
-    }
-
-    const roles = Array.from(rolesSet);
+    const roles = account.CuentaRole.map((cr) => cr.Role.nombre);
 
     const scopes = account.CuentaRole.map((cr) => ({
       role: cr.Role.nombre,
@@ -138,14 +129,14 @@ export class AuthService {
       scopeId: cr.id_scope ?? null,
     }));
 
-    const permissionsSet = new Set<string>();
+  const permissionsSet = new Set<string>();
     account.CuentaRole.forEach((cr) => {
       cr.Role.RolePermission.forEach((rp) => {
         permissionsSet.add(`${rp.Permission.action}:${rp.Permission.resource}`);
       });
     });
 
-    this.normalizeAdultReadPermissions(roles, permissionsSet);
+    this.normalizeAdultReadPermissions(roles, scopes, permissionsSet);
     this.normalizeMemberCajaPermissions(account.Miembro, permissionsSet, roles);
 
     return {
@@ -160,6 +151,7 @@ export class AuthService {
 
   private normalizeAdultReadPermissions(
     roles: string[],
+    scopes: RoleScope[],
     permissionsSet: Set<string>,
   ): void {
     const hasAdminBypassRole = roles.some((role) =>
@@ -171,8 +163,18 @@ export class AuthService {
     const hasAdultReadOnlyRole = roles.some((role) =>
       ADULT_READ_ONLY_ROLES.has(role),
     );
+    const hasFullGroupReadOnlyRoleScope = scopes.some(
+      (scope) =>
+        ADULT_READ_ONLY_ROLES.has(scope.role) &&
+        (scope.scopeType === SCOPE.GRUPO || scope.scopeType === SCOPE.GLOBAL),
+    );
 
-    if (hasAdminBypassRole || !hasAdultMemberRole || !hasAdultReadOnlyRole) {
+    if (
+      hasAdminBypassRole ||
+      !hasAdultMemberRole ||
+      !hasAdultReadOnlyRole ||
+      hasFullGroupReadOnlyRoleScope
+    ) {
       return;
     }
 

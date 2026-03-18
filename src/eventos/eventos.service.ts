@@ -5,6 +5,10 @@ import {
 } from '@nestjs/common';
 import { Prisma, SCOPE } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
+import {
+  hasScopedRoleAccess,
+  hasUnrestrictedAccess,
+} from '../auth/utils/unrestricted-access.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssignEventoComisionDto } from './dto/assign-evento-comision.dto';
 import { CalendarEventosQueryDto } from './dto/calendar-eventos-query.dto';
@@ -111,7 +115,7 @@ export class EventosService {
   }
 
   async getCalendarEvents(
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     query: CalendarEventosQueryDto,
   ) {
     const from = new Date(query.from);
@@ -130,35 +134,40 @@ export class EventosService {
     }
 
     return this.prisma.evento.findMany({
-      where: {
-        borrado: false,
-        fecha_inicio: {
-          lte: to,
-        },
-        fecha_fin: {
-          gte: from,
-        },
-        ...(query.idTipo !== undefined ? { id_tipo: query.idTipo } : {}),
-        ...(query.idArea !== undefined
-          ? {
-              AreaAfectada: {
-                some: {
-                  id_area: query.idArea,
+      where: this.mergeEventoWhere(
+        {
+          borrado: false,
+          fecha_inicio: {
+            lte: to,
+          },
+          fecha_fin: {
+            gte: from,
+          },
+          ...(query.idTipo !== undefined ? { id_tipo: query.idTipo } : {}),
+          ...(query.idArea !== undefined
+            ? {
+                AreaAfectada: {
+                  some: {
+                    id_area: query.idArea,
+                  },
                 },
-              },
-            }
-          : {}),
-        ...(query.idRama !== undefined
-          ? {
-              RamaAfectada: {
-                some: {
-                  id_rama: query.idRama,
-                  borrado: false,
+              }
+            : {}),
+          ...(query.idRama !== undefined
+            ? {
+                RamaAfectada: {
+                  some: {
+                    id_rama: query.idRama,
+                    borrado: false,
+                  },
                 },
-              },
-            }
-          : {}),
-      },
+              }
+            : {}),
+        },
+        user.roles.includes('PROTAGONISTA') || user.roles.includes('RESPONSABLE')
+          ? this.buildEventoScopeWhere(user)
+          : undefined,
+      ),
       orderBy: [{ fecha_inicio: 'asc' }, { nombre: 'asc' }],
       select: {
         id: true,
@@ -651,11 +660,7 @@ export class EventosService {
   private buildEventoScopeWhere(
     user: AuthenticatedUser,
   ): Prisma.EventoWhereInput | undefined {
-    if (
-      user.roles.includes('ADM') ||
-      user.roles.includes('OWN') ||
-      user.roles.includes('JEFATURA')
-    ) {
+    if (hasUnrestrictedAccess(user)) {
       return undefined;
     }
 
@@ -679,6 +684,102 @@ export class EventosService {
           },
         });
       }
+    }
+
+    if (user.roles.includes('PROTAGONISTA')) {
+      filters.push({
+        OR: [
+          {
+            AreaAfectada: {
+              some: {
+                Area: {
+                  borrado: false,
+                  nombre: 'Jefatura',
+                },
+              },
+            },
+          },
+          {
+            InscripcionEvento: {
+              some: {
+                borrado: false,
+                Miembro: {
+                  borrado: false,
+                  id_cuenta: user.userId,
+                  Protagonista: {
+                    is: {
+                      borrado: false,
+                      activo: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      });
+    }
+
+    if (user.roles.includes('RESPONSABLE')) {
+      filters.push({
+        OR: [
+          {
+            AreaAfectada: {
+              some: {
+                Area: {
+                  borrado: false,
+                  nombre: 'Jefatura',
+                },
+              },
+            },
+          },
+          {
+            InscripcionEvento: {
+              some: {
+                borrado: false,
+                Miembro: {
+                  borrado: false,
+                  id_cuenta: user.userId,
+                  Responsable: {
+                    is: {
+                      borrado: false,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          {
+            InscripcionEvento: {
+              some: {
+                borrado: false,
+                Miembro: {
+                  borrado: false,
+                  Protagonista: {
+                    is: {
+                      borrado: false,
+                      Responsabilidad: {
+                        some: {
+                          borrado: false,
+                          Responsable: {
+                            is: {
+                              borrado: false,
+                              Miembro: {
+                                borrado: false,
+                                id_cuenta: user.userId,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      });
     }
 
     if (filters.length === 0) {
@@ -747,7 +848,7 @@ export class EventosService {
     areaIds: number[],
     ramaIds: number[],
   ): Promise<{ areaIds: number[]; ramaIds: number[] }> {
-    if (user.roles.includes('JEFATURA')) {
+    if (hasScopedRoleAccess(user, 'JEFATURA', [SCOPE.GRUPO, SCOPE.GLOBAL])) {
       const areaJefatura = await this.prisma.area.findFirst({
         where: {
           nombre: 'Jefatura',
@@ -805,11 +906,7 @@ export class EventosService {
   }
 
   private buildVisibleMiembroWhere(user: AuthenticatedUser): Prisma.MiembroWhereInput {
-    if (
-      user.roles.includes('ADM') ||
-      user.roles.includes('OWN') ||
-      user.roles.includes('JEFATURA')
-    ) {
+    if (hasUnrestrictedAccess(user)) {
       return {
         borrado: false,
       };

@@ -9,10 +9,8 @@ import { existsSync } from 'node:fs';
 import * as path from 'node:path';
 import { Prisma, SCOPE } from '@prisma/client';
 import PDFDocument = require('pdfkit');
-import {
-  AuthenticatedScope,
-  AuthenticatedUser,
-} from '../auth/types/auth-request.types';
+import { AuthenticatedUser } from '../auth/types/auth-request.types';
+import { hasUnrestrictedAccess } from '../auth/utils/unrestricted-access.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { CreatePagoDto } from './dto/create-pago.dto';
@@ -24,13 +22,6 @@ type VisibleCuenta = {
   nombre: string;
   monto_actual: Prisma.Decimal;
 };
-
-const FULL_ACCESS_ROLES = new Set([
-  'ADM',
-  'OWN',
-  'JEFATURA',
-  'SECRETARIA_TESORERIA',
-]);
 
 const ADULT_SCOPED_ROLES = new Set([
   'JEFATURA_RAMA',
@@ -1114,18 +1105,6 @@ export class PagosService {
                 Responsabilidad: {
                   some: {
                     borrado: false,
-                  },
-                },
-              },
-            },
-          },
-          {
-            Protagonista: {
-              is: {
-                borrado: false,
-                Responsabilidad: {
-                  some: {
-                    borrado: false,
                     Responsable: {
                       Miembro: {
                         id_cuenta: user.userId,
@@ -1166,16 +1145,7 @@ export class PagosService {
   }
 
   private hasFullAccess(user: AuthenticatedUser): boolean {
-    if (user.roles.some((role) => FULL_ACCESS_ROLES.has(role))) {
-      return true;
-    }
-
-    return user.scopes.some(
-      (scope: AuthenticatedScope) =>
-        scope.scopeType === SCOPE.GLOBAL ||
-        scope.scopeType === SCOPE.GRUPO ||
-        scope.scopeType === SCOPE.OWN,
-    );
+    return hasUnrestrictedAccess(user);
   }
 
   private async buildReceiptPdfBuffer(

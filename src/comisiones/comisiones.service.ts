@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, SCOPE } from '@prisma/client';
+import { AuthenticatedUser } from '../auth/types/auth-request.types';
+import { hasUnrestrictedAccess } from '../auth/utils/unrestricted-access.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { ComisionesQueryDto } from './dto/comisiones-query.dto';
 import { CreateComisionDto } from './dto/create-comision.dto';
@@ -10,7 +12,7 @@ import { UpdateComisionDto } from './dto/update-comision.dto';
 export class ComisionesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(query: ComisionesQueryDto) {
+  async findAll(user: AuthenticatedUser, query: ComisionesQueryDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
@@ -19,6 +21,7 @@ export class ComisionesService {
       trimmedQuery && /^\d+$/.test(trimmedQuery) ? Number(trimmedQuery) : null;
     const where: Prisma.ComisionWhereInput = {
       borrado: false,
+      ...this.buildComisionScopeWhere(user),
       ...(trimmedQuery
         ? {
             OR: [
@@ -91,9 +94,13 @@ export class ComisionesService {
     return { eventos, adultos };
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, user?: AuthenticatedUser) {
     const comision = await this.prisma.comision.findFirst({
-      where: { id, borrado: false },
+      where: {
+        id,
+        borrado: false,
+        ...(user ? this.buildComisionScopeWhere(user) : {}),
+      },
       select: this.comisionDetailSelect(),
     });
 
@@ -138,8 +145,8 @@ export class ComisionesService {
     });
   }
 
-  async getParticipantes(id: number) {
-    await this.ensureExists(id);
+  async getParticipantes(id: number, user?: AuthenticatedUser) {
+    await this.ensureExists(id, user);
 
     return this.prisma.participantesComision.findMany({
       where: {
@@ -244,14 +251,155 @@ export class ComisionesService {
     });
   }
 
-  private async ensureExists(id: number) {
+  private async ensureExists(id: number, user?: AuthenticatedUser) {
     const comision = await this.prisma.comision.findFirst({
-      where: { id, borrado: false },
+      where: {
+        id,
+        borrado: false,
+        ...(user ? this.buildComisionScopeWhere(user) : {}),
+      },
       select: { id: true },
     });
     if (!comision) {
       throw new NotFoundException('La comisión indicada no existe.');
     }
+  }
+
+  private buildComisionScopeWhere(
+    user: AuthenticatedUser,
+  ): Prisma.ComisionWhereInput {
+    if (hasUnrestrictedAccess(user)) {
+      return {};
+    }
+
+    if (user.roles.includes('PROTAGONISTA')) {
+      return {
+        Evento: {
+          is: {
+            OR: [
+              {
+                AreaAfectada: {
+                  some: {
+                    Area: {
+                      borrado: false,
+                      nombre: 'Jefatura',
+                    },
+                  },
+                },
+              },
+              {
+                InscripcionEvento: {
+                  some: {
+                    borrado: false,
+                    Miembro: {
+                      borrado: false,
+                      id_cuenta: user.userId,
+                      Protagonista: {
+                        is: {
+                          borrado: false,
+                          activo: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      };
+    }
+
+    if (user.roles.includes('RESPONSABLE')) {
+      return {
+        Evento: {
+          is: {
+            OR: [
+              {
+                AreaAfectada: {
+                  some: {
+                    Area: {
+                      borrado: false,
+                      nombre: 'Jefatura',
+                    },
+                  },
+                },
+              },
+              {
+                InscripcionEvento: {
+                  some: {
+                    borrado: false,
+                    Miembro: {
+                      borrado: false,
+                      id_cuenta: user.userId,
+                      Responsable: {
+                        is: {
+                          borrado: false,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              {
+                InscripcionEvento: {
+                  some: {
+                    borrado: false,
+                    Miembro: {
+                      borrado: false,
+                      Protagonista: {
+                        is: {
+                          borrado: false,
+                          Responsabilidad: {
+                            some: {
+                              borrado: false,
+                              Responsable: {
+                                is: {
+                                  borrado: false,
+                                  Miembro: {
+                                    borrado: false,
+                                    id_cuenta: user.userId,
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      };
+    }
+
+    for (const scope of user.scopes) {
+      if (
+        (scope.role === 'JEFATURA_RAMA' || scope.role === 'AYUDANTE_RAMA') &&
+        scope.scopeType === SCOPE.RAMA &&
+        scope.scopeId != null
+      ) {
+        return {
+          Evento: {
+            is: {
+              RamaAfectada: {
+                some: {
+                  id_rama: scope.scopeId,
+                  borrado: false,
+                },
+              },
+            },
+          },
+        };
+      }
+    }
+
+    return {
+      id: -1,
+    };
   }
 
   private async ensureEventoExists(id: number) {

@@ -1,11 +1,16 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class CalendarioService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getCumpleanios(fromValue: string, toValue: string) {
+  async getCumpleanios(
+    user: AuthenticatedUser,
+    fromValue: string,
+    toValue: string,
+  ) {
     const from = new Date(fromValue);
     const to = new Date(toValue);
 
@@ -22,9 +27,7 @@ export class CalendarioService {
     }
 
     const miembros = await this.prisma.miembro.findMany({
-      where: {
-        borrado: false,
-      },
+      where: this.buildBirthdayWhere(user),
       orderBy: [{ apellidos: 'asc' }, { nombre: 'asc' }],
       select: {
         id: true,
@@ -167,5 +170,125 @@ export class CalendarioService {
 
   private isLeapYear(year: number) {
     return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  }
+
+  private buildBirthdayWhere(user: AuthenticatedUser) {
+    if (user.roles.includes('RESPONSABLE')) {
+      return {
+        borrado: false,
+        Protagonista: {
+          is: {
+            borrado: false,
+            activo: true,
+            Responsabilidad: {
+              some: {
+                borrado: false,
+                Responsable: {
+                  is: {
+                    borrado: false,
+                    Miembro: {
+                      borrado: false,
+                      id_cuenta: user.userId,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+    }
+
+    if (!user.roles.includes('PROTAGONISTA')) {
+      return {
+        borrado: false,
+      };
+    }
+
+    return {
+      borrado: false,
+      OR: [
+        {
+          MiembroRama: {
+            some: {
+              borrado: false,
+              fecha_egreso: null,
+              Rama: {
+                borrado: false,
+                MiembroRama: {
+                  some: {
+                    borrado: false,
+                    fecha_egreso: null,
+                    Miembro: {
+                      borrado: false,
+                      id_cuenta: user.userId,
+                      Protagonista: {
+                        is: {
+                          borrado: false,
+                          activo: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        {
+          Adulto: {
+            is: {
+              borrado: false,
+              activo: true,
+              EquipoArea: {
+                some: {
+                  borrado: false,
+                  activo: true,
+                  fecha_fin: null,
+                  Rama: {
+                    borrado: false,
+                    MiembroRama: {
+                      some: {
+                        borrado: false,
+                        fecha_egreso: null,
+                        Miembro: {
+                          borrado: false,
+                          id_cuenta: user.userId,
+                          Protagonista: {
+                            is: {
+                              borrado: false,
+                              activo: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        {
+          Responsable: {
+            is: {
+              borrado: false,
+              Responsabilidad: {
+                some: {
+                  borrado: false,
+                  Protagonista: {
+                    borrado: false,
+                    Miembro: {
+                      borrado: false,
+                      id_cuenta: user.userId,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      ],
+    };
   }
 }

@@ -7,10 +7,10 @@ import {
 import { Reflector } from '@nestjs/core';
 import {
   AcceptedRole,
-  BYPASS_ROLES,
   ROLES_KEY,
-  RoleAwareRequest,
 } from '../decorators/roles.decorator';
+import { AuthenticatedRequest } from '../types/auth-request.types';
+import { hasUnrestrictedAccess } from '../utils/unrestricted-access.util';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -23,7 +23,7 @@ export class RolesGuard implements CanActivate {
         context.getClass(),
       ]) ?? [];
 
-    const request = context.switchToHttp().getRequest<RoleAwareRequest>();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     request.acceptedRoles = requiredRoles;
 
     if (requiredRoles.length === 0) {
@@ -37,7 +37,8 @@ export class RolesGuard implements CanActivate {
     }
 
     const grantedRoles = new Set(userRoles);
-    const hasBypassRole = BYPASS_ROLES.some((role) => grantedRoles.has(role));
+    const hasBypassRole =
+      request.user !== undefined && hasUnrestrictedAccess(request.user);
 
     if (hasBypassRole) {
       return true;

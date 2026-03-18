@@ -950,6 +950,8 @@ type RoleDefinition = {
 
 const PROTAGONISTA_READONLY_RESOURCES = [
   RESOURCE.CUENTA_DINERO,
+  RESOURCE.COMISION,
+  RESOURCE.PARTICIPANTE_COMISION,
   RESOURCE.PLAN_FORMACION,
   RESOURCE.PLAN_DESEMPENO,
 ] as const;
@@ -1022,14 +1024,10 @@ const ADULT_PLAN_DESEMPENO_PERMISSIONS: RoleDefinition['permissions'][number] = 
 
 const RESPONSABLE_READ_PERMISSIONS: RoleDefinition['permissions'][number] = {
   actions: [ACTION.READ],
-  resources: ALL_RESOURCES,
+  resources: ALL_RESOURCES.filter(
+    (resource) => resource !== RESOURCE.RELACION,
+  ),
 };
-
-const RESPONSABLE_PROTAGONISTA_UPDATE_PERMISSIONS: RoleDefinition['permissions'][number] =
-  {
-    actions: [ACTION.UPDATE],
-    resources: [RESOURCE.MIEMBRO, RESOURCE.PROTAGONISTA],
-  };
 
 const ROLE_DEFINITIONS: RoleDefinition[] = [
   {
@@ -1057,16 +1055,35 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
   {
     nombre: 'RESPONSABLE',
     descripcion:
-      'Acceso de lectura general con capacidad de editar protagonistas segun las restricciones aplicadas por el backend.',
+      'Acceso de lectura general sobre las secciones habilitadas para consulta, con restricciones aplicadas por el backend segun sus vinculos.',
     permissions: [
       RESPONSABLE_READ_PERMISSIONS,
-      RESPONSABLE_PROTAGONISTA_UPDATE_PERMISSIONS,
     ],
   },
   {
     nombre: 'JEFATURA',
     descripcion:
       'Acceso total a las herramientas del sistema con capacidad de realizar modificaciones.',
+    permissions: [
+      {
+        actions: [ACTION.MANAGE],
+        resources: ALL_RESOURCES,
+      },
+      ADULT_CONCEPTO_PAGO_PERMISSIONS,
+      ADULT_METODO_PAGO_PERMISSIONS,
+      ADULT_CUENTA_DINERO_PERMISSIONS,
+      ADULT_CONSEJO_PERMISSIONS,
+      ADULT_EVENTO_PERMISSIONS,
+      ADULT_COMISION_PERMISSIONS,
+      ADULT_TIPO_EVENTO_PERMISSIONS,
+      ADULT_PLAN_FORMACION_PERMISSIONS,
+      ADULT_PLAN_DESEMPENO_PERMISSIONS,
+    ],
+  },
+  {
+    nombre: 'AYUDANTE',
+    descripcion:
+      'Acceso total de grupo para adultos comodin que colaboran transversalmente entre jefatura y ramas segun necesidad operativa.',
     permissions: [
       {
         actions: [ACTION.MANAGE],
@@ -1970,7 +1987,7 @@ async function seedAdminAccount(
     where: {
       id_cuenta: cuenta.id,
       id_role: jefaturaRoleId,
-      tipo_scope: SCOPE.GLOBAL,
+      tipo_scope: SCOPE.GRUPO,
       id_scope: null,
     },
   });
@@ -1980,7 +1997,7 @@ async function seedAdminAccount(
       data: {
         id_cuenta: cuenta.id,
         id_role: jefaturaRoleId,
-        tipo_scope: SCOPE.GLOBAL,
+        tipo_scope: SCOPE.GRUPO,
       },
     });
   }
@@ -1989,7 +2006,7 @@ async function seedAdminAccount(
     where: {
       id_cuenta: cuenta.id,
       id_role: admRoleId,
-      tipo_scope: SCOPE.GLOBAL,
+      tipo_scope: SCOPE.GRUPO,
       id_scope: null,
     },
   });
@@ -1999,7 +2016,7 @@ async function seedAdminAccount(
       data: {
         id_cuenta: cuenta.id,
         id_role: admRoleId,
-        tipo_scope: SCOPE.GLOBAL,
+        tipo_scope: SCOPE.GRUPO,
       },
     });
   }

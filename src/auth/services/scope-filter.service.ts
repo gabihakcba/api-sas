@@ -1,19 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, SCOPE } from '@prisma/client';
-import { BYPASS_ROLES } from '../decorators/roles.decorator';
 import {
   AuthenticatedScope,
   AuthenticatedUser,
 } from '../types/auth-request.types';
+import { hasUnrestrictedAccess } from '../utils/unrestricted-access.util';
 
 type ScopedWhere<TWhere> = TWhere | Record<string, never>;
 
-const CUENTA_DINERO_FULL_ACCESS_ROLES = new Set([
-  'ADM',
-  'OWN',
-  'JEFATURA',
-  'SECRETARIA_TESORERIA',
-]);
+const BRANCH_SCOPE_ROLES = new Set(['JEFATURA_RAMA', 'AYUDANTE_RAMA']);
+const AREA_SCOPE_ROLES = new Set(['SECRETARIA_TESORERIA', 'INTENDENCIA']);
 
 const ADULT_ACCOUNT_SCOPE_ROLES = new Set([
   'JEFATURA_RAMA',
@@ -30,7 +26,7 @@ export class ScopeFilterService {
       return {};
     }
 
-    return this.toWhereInput(this.buildProtagonistaFilters(user.scopes));
+    return this.toWhereInput(this.buildProtagonistaFilters(user));
   }
 
   forAdultos(user: AuthenticatedUser): ScopedWhere<Prisma.AdultoWhereInput> {
@@ -48,7 +44,7 @@ export class ScopeFilterService {
       return {};
     }
 
-    return this.toWhereInput(this.buildResponsableFilters(user.scopes));
+    return this.toWhereInput(this.buildResponsableFilters(user));
   }
 
   forPagos(user: AuthenticatedUser): ScopedWhere<Prisma.PagoWhereInput> {
@@ -134,33 +130,27 @@ export class ScopeFilterService {
   }
 
   private hasUnrestrictedAccess(user: AuthenticatedUser): boolean {
-    if (BYPASS_ROLES.some((role) => user.roles.includes(role))) {
-      return true;
-    }
-
-    return user.scopes.some(
-      (scope) =>
-        scope.scopeType === SCOPE.GLOBAL ||
-        scope.scopeType === SCOPE.GRUPO ||
-        scope.scopeType === SCOPE.OWN,
-    );
+    return hasUnrestrictedAccess(user);
   }
 
   private hasUnrestrictedCuentaDineroAccess(user: AuthenticatedUser): boolean {
-    return user.roles.some((role) => CUENTA_DINERO_FULL_ACCESS_ROLES.has(role));
+    return hasUnrestrictedAccess(user);
   }
 
   private buildProtagonistaFilters(
-    scopes: AuthenticatedScope[],
+    user: AuthenticatedUser,
   ): Prisma.ProtagonistaWhereInput[] {
     const filters: Prisma.ProtagonistaWhereInput[] = [];
 
-    for (const scope of scopes) {
+    for (const scope of user.scopes) {
       if (scope.scopeId == null) {
         continue;
       }
 
-      if (scope.scopeType === SCOPE.RAMA) {
+      if (
+        scope.scopeType === SCOPE.RAMA &&
+        BRANCH_SCOPE_ROLES.has(scope.role)
+      ) {
         filters.push({
           Miembro: {
             MiembroRama: {
@@ -174,7 +164,10 @@ export class ScopeFilterService {
         });
       }
 
-      if (scope.scopeType === SCOPE.AREA) {
+      if (
+        scope.scopeType === SCOPE.AREA &&
+        AREA_SCOPE_ROLES.has(scope.role)
+      ) {
         filters.push({
           Miembro: {
             MiembroRama: {
@@ -190,6 +183,23 @@ export class ScopeFilterService {
           },
         });
       }
+    }
+
+    if (user.roles.includes('RESPONSABLE')) {
+      filters.push({
+        Responsabilidad: {
+          some: {
+            borrado: false,
+            Responsable: {
+              borrado: false,
+              Miembro: {
+                borrado: false,
+                id_cuenta: user.userId,
+              },
+            },
+          },
+        },
+      });
     }
 
     return filters;
@@ -244,16 +254,19 @@ export class ScopeFilterService {
   }
 
   private buildResponsableFilters(
-    scopes: AuthenticatedScope[],
+    user: AuthenticatedUser,
   ): Prisma.ResponsableWhereInput[] {
     const filters: Prisma.ResponsableWhereInput[] = [];
 
-    for (const scope of scopes) {
+    for (const scope of user.scopes) {
       if (scope.scopeId == null) {
         continue;
       }
 
-      if (scope.scopeType === SCOPE.RAMA) {
+      if (
+        scope.scopeType === SCOPE.RAMA &&
+        BRANCH_SCOPE_ROLES.has(scope.role)
+      ) {
         filters.push({
           Responsabilidad: {
             some: {
@@ -276,7 +289,10 @@ export class ScopeFilterService {
         });
       }
 
-      if (scope.scopeType === SCOPE.AREA) {
+      if (
+        scope.scopeType === SCOPE.AREA &&
+        AREA_SCOPE_ROLES.has(scope.role)
+      ) {
         filters.push({
           Responsabilidad: {
             some: {
@@ -301,6 +317,31 @@ export class ScopeFilterService {
           },
         });
       }
+    }
+
+    if (user.roles.includes('RESPONSABLE')) {
+      filters.push({
+        Responsabilidad: {
+          some: {
+            borrado: false,
+            Protagonista: {
+              borrado: false,
+              Responsabilidad: {
+                some: {
+                  borrado: false,
+                  Responsable: {
+                    borrado: false,
+                    Miembro: {
+                      borrado: false,
+                      id_cuenta: user.userId,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
     }
 
     return filters;
@@ -453,16 +494,42 @@ export class ScopeFilterService {
 
     if (user.roles.includes('PROTAGONISTA')) {
       filters.push({
-        Miembro: {
-          id_cuenta: user.userId,
-          borrado: false,
-          Protagonista: {
-            is: {
+        OR: [
+          {
+            Miembro: {
+              id_cuenta: user.userId,
               borrado: false,
-              activo: true,
+              Protagonista: {
+                is: {
+                  borrado: false,
+                  activo: true,
+                },
+              },
             },
           },
-        },
+          {
+            Miembro: {
+              borrado: false,
+              Responsable: {
+                is: {
+                  borrado: false,
+                  Responsabilidad: {
+                    some: {
+                      borrado: false,
+                      Protagonista: {
+                        borrado: false,
+                        Miembro: {
+                          id_cuenta: user.userId,
+                          borrado: false,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ],
       });
     }
 
