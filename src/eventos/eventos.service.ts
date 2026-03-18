@@ -11,6 +11,7 @@ import {
   hasUnrestrictedAccess,
 } from '../auth/utils/unrestricted-access.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { CiclosProgramaService } from '../ciclos-programa/ciclos-programa.service';
 import { AssignEventoComisionDto } from './dto/assign-evento-comision.dto';
 import { CalendarEventosQueryDto } from './dto/calendar-eventos-query.dto';
 import { CreateEventoDto } from './dto/create-evento.dto';
@@ -21,7 +22,10 @@ import { UpdateEventoDto } from './dto/update-evento.dto';
 
 @Injectable()
 export class EventosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ciclosProgramaService: CiclosProgramaService,
+  ) {}
 
   async findAll(user: AuthenticatedUser, query: EventosQueryDto) {
     const page = query.page ?? 1;
@@ -236,6 +240,15 @@ export class EventosService {
     await this.ensureTipoExists(dto.idTipo);
     await this.ensureAreasExist(normalizedAfectaciones.areaIds);
     await this.ensureRamasExist(normalizedAfectaciones.ramaIds);
+    const idCicloPrograma =
+      dto.idCicloPrograma !== undefined
+        ? (
+            await this.ciclosProgramaService.ensureCicloExistsForEvento(
+              dto.idCicloPrograma,
+              normalizedAfectaciones.ramaIds,
+            )
+          ).id
+        : null;
 
     const created = await this.prisma.evento.create({
       data: {
@@ -249,6 +262,7 @@ export class EventosService {
         costo_ma: new Prisma.Decimal(dto.costoMa),
         costo_ayudante: new Prisma.Decimal(dto.costoAyudante),
         id_tipo: dto.idTipo,
+        id_ciclo_programa: idCicloPrograma,
         AreaAfectada: {
           create: normalizedAfectaciones.areaIds.map((idArea) => ({ id_area: idArea })),
         },
@@ -280,6 +294,42 @@ export class EventosService {
               dto.ramaIds ?? [],
             )
           : null;
+      const currentEvento = await tx.evento.findFirst({
+        where: {
+          id,
+          borrado: false,
+        },
+        select: {
+          id_ciclo_programa: true,
+          RamaAfectada: {
+            where: {
+              borrado: false,
+            },
+            select: {
+              id_rama: true,
+            },
+          },
+        },
+      });
+
+      if (!currentEvento) {
+        throw new NotFoundException('El evento indicado no existe.');
+      }
+
+      const effectiveRamaIds =
+        normalizedAfectaciones?.ramaIds ??
+        currentEvento.RamaAfectada.map((item) => item.id_rama);
+      const idCicloPrograma =
+        dto.idCicloPrograma !== undefined
+          ? dto.idCicloPrograma === null
+            ? null
+            : (
+                await this.ciclosProgramaService.ensureCicloExistsForEvento(
+                  dto.idCicloPrograma,
+                  effectiveRamaIds,
+                )
+              ).id
+          : undefined;
 
       await tx.evento.update({
         where: { id },
@@ -302,6 +352,9 @@ export class EventosService {
             ? { costo_ayudante: new Prisma.Decimal(dto.costoAyudante) }
             : {}),
           ...(dto.idTipo !== undefined ? { id_tipo: dto.idTipo } : {}),
+          ...(idCicloPrograma !== undefined
+            ? { id_ciclo_programa: idCicloPrograma }
+            : {}),
         },
       });
 
@@ -599,6 +652,19 @@ export class EventosService {
       costo_mp: true,
       costo_ma: true,
       costo_ayudante: true,
+      CicloPrograma: {
+        select: {
+          id: true,
+          nombre: true,
+          estado: true,
+          Rama: {
+            select: {
+              id: true,
+              nombre: true,
+            },
+          },
+        },
+      },
       TipoEvento: { select: { id: true, nombre: true } },
       Comision: {
         where: { borrado: false },

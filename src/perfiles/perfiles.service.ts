@@ -7,7 +7,9 @@ import { Prisma, SCOPE } from '@prisma/client';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import { hasUnrestrictedAccess } from '../auth/utils/unrestricted-access.util';
+import { CuentasService } from '../cuentas/cuentas.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { UpdatePerfilPersonalDto } from './dto/update-perfil-personal.dto';
 import { UpdatePerfilFirmaDto } from './dto/update-perfil-firma.dto';
 
 @Injectable()
@@ -15,10 +17,70 @@ export class PerfilesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scopeFilterService: ScopeFilterService,
+    private readonly cuentasService: CuentasService,
   ) {}
 
   async findMe(user: AuthenticatedUser) {
     const miembroId = await this.resolveOwnMemberId(user);
+    return this.findOne(miembroId, user);
+  }
+
+  async updateMe(user: AuthenticatedUser, dto: UpdatePerfilPersonalDto) {
+    const miembroId = await this.resolveOwnMemberId(user);
+
+    const miembro = await this.prisma.miembro.findFirst({
+      where: {
+        id: miembroId,
+        borrado: false,
+      },
+      select: {
+        id: true,
+        id_cuenta: true,
+      },
+    });
+
+    if (!miembro || !miembro.id_cuenta) {
+      throw new NotFoundException('No se encontró un perfil asociado a la cuenta.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.cuentasService.updateCuentaConMiembro(
+        tx,
+        {
+          cuentaId: miembro.id_cuenta!,
+          miembroId: miembro.id,
+        },
+        {
+          ...(dto.nombre !== undefined ? { nombre: dto.nombre.trim() } : {}),
+          ...(dto.apellidos !== undefined
+            ? { apellidos: dto.apellidos.trim() }
+            : {}),
+          ...(dto.dni !== undefined ? { dni: dto.dni.trim() } : {}),
+          ...(dto.fechaNacimiento !== undefined
+            ? { fechaNacimiento: dto.fechaNacimiento }
+            : {}),
+          ...(dto.direccion !== undefined
+            ? { direccion: dto.direccion.trim() }
+            : {}),
+          ...(dto.email !== undefined
+            ? { email: dto.email?.trim() || null }
+            : {}),
+          ...(dto.telefono !== undefined
+            ? { telefono: dto.telefono?.trim() || null }
+            : {}),
+          ...(dto.telefonoEmergencia !== undefined
+            ? { telefonoEmergencia: dto.telefonoEmergencia.trim() }
+            : {}),
+          ...(dto.totem !== undefined
+            ? { totem: dto.totem?.trim() || null }
+            : {}),
+          ...(dto.cualidad !== undefined
+            ? { cualidad: dto.cualidad?.trim() || null }
+            : {}),
+        },
+      );
+    });
+
     return this.findOne(miembroId, user);
   }
 

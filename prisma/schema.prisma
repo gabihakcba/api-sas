@@ -238,6 +238,7 @@ model Rama {
   EquipoArea   EquipoArea[]   @relation(name: "EquipoAreaRama")
   CuentaDinero CuentaDinero[] @relation(name: "CuentaRama")
   RamaAfectada RamaAfectada[] @relation(name: "RamaAfectadaRama")
+  CicloPrograma CicloPrograma[] @relation(name: "CicloProgramaRama")
 }
 
 model PosicionArea {
@@ -292,10 +293,12 @@ model Evento {
   updatedAt DateTime @updatedAt
 
   // Foreign keys
-  id_tipo Int
+  id_tipo           Int
+  id_ciclo_programa Int?
 
   // Foreign key relations
-  TipoEvento TipoEvento @relation(fields: [id_tipo], references: [id], name: "EventoTipoEvento")
+  TipoEvento    TipoEvento     @relation(fields: [id_tipo], references: [id], name: "EventoTipoEvento")
+  CicloPrograma CicloPrograma? @relation(fields: [id_ciclo_programa], references: [id], name: "EventoCicloPrograma")
 
   // Relations
   Comision          Comision[]          @relation(name: "ComisionEvento")
@@ -303,6 +306,34 @@ model Evento {
   RamaAfectada      RamaAfectada[]      @relation(name: "RamaAfectadaEvento")
   InscripcionEvento InscripcionEvento[] @relation(name: "InscripcionEventoEvento")
   Pago              Pago[]              @relation(name: "PagoEvento")
+
+  @@index([id_ciclo_programa])
+}
+
+model CicloPrograma {
+  id            Int          @id @default(autoincrement())
+  nombre        String
+  descripcion   String?
+  fecha_inicio  DateTime
+  fecha_fin     DateTime
+  estado        ESTADO_CICLO @default(DIAGNOSTICO)
+  diagnostico   String?      @db.Text
+  planificacion String?      @db.Text
+  desarrollo    String?      @db.Text
+  evaluacion    String?      @db.Text
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  id_rama Int
+
+  Rama   Rama     @relation(fields: [id_rama], references: [id], name: "CicloProgramaRama")
+  Evento Evento[] @relation(name: "EventoCicloPrograma")
+
+  @@index([id_rama, borrado])
+  @@index([id_rama, estado, borrado])
+  @@index([fecha_inicio, fecha_fin])
 }
 
 model TipoEvento {
@@ -817,6 +848,14 @@ enum ESTADO_TEMARIO {
   POSPUESTO
 }
 
+enum ESTADO_CICLO {
+  DIAGNOSTICO
+  PLANIFICACION
+  DESARROLLO
+  EVALUACION
+  FINALIZADO
+}
+
 model TemarioConsejo {
   id          Int            @id @default(autoincrement())
   titulo      String
@@ -925,6 +964,7 @@ enum RESOURCE {
   ASISTENCIA_CONSEJO
   PLAN_DESEMPENO
   ADJUNTO_FORMACION
+  CICLO_PROGRAMA
 }
 
 model Permission {

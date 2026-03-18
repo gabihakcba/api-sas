@@ -58,6 +58,12 @@ export class CreateEventoDto {
   idTipo: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  idCicloPrograma?: number;
+
+  @IsOptional()
   @IsArray()
   @ArrayUnique()
   @Type(() => Number)

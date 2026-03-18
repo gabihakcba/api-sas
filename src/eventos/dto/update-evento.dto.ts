@@ -65,6 +65,12 @@ export class UpdateEventoDto {
   idTipo?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  idCicloPrograma?: number | null;
+
+  @IsOptional()
   @IsArray()
   @ArrayUnique()
   @Type(() => Number)

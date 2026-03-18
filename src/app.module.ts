@@ -9,6 +9,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ComisionesModule } from './comisiones/comisiones.module';
 import { CalendarioModule } from './calendario/calendario.module';
+import { CiclosProgramaModule } from './ciclos-programa/ciclos-programa.module';
 import { ConsejosModule } from './consejos/consejos.module';
 import { ConceptosPagoModule } from './conceptos-pago/conceptos-pago.module';
 import { CuentasModule } from './cuentas/cuentas.module';
@@ -35,6 +36,7 @@ import { TiposEventoModule } from './tipos-evento/tipos-evento.module';
     PrismaModule,
     AuditModule,
     CalendarioModule,
+    CiclosProgramaModule,
     AuthModule,
     ComisionesModule,
     ConsejosModule,

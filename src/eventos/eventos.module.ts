@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { CiclosProgramaModule } from '../ciclos-programa/ciclos-programa.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EventosController } from './eventos.controller';
 import { EventosService } from './eventos.service';
 
 @Module({
-  imports: [PrismaModule, AuthModule],
+  imports: [PrismaModule, AuthModule, CiclosProgramaModule],
   controllers: [EventosController],
   providers: [EventosService],
 })

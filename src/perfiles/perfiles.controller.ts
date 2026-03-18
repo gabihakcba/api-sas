@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedRequest } from '../auth/types/auth-request.types';
+import { UpdatePerfilPersonalDto } from './dto/update-perfil-personal.dto';
 import { UpdatePerfilFirmaDto } from './dto/update-perfil-firma.dto';
 import { PerfilesService } from './perfiles.service';
 
@@ -21,6 +22,14 @@ export class PerfilesController {
   @Get('me')
   async findMe(@Request() req: AuthenticatedRequest) {
     return this.perfilesService.findMe(req.user!);
+  }
+
+  @Patch('me')
+  async updateMe(
+    @Body() dto: UpdatePerfilPersonalDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.perfilesService.updateMe(req.user!, dto);
   }
 
   @Get('me/asignacion')
