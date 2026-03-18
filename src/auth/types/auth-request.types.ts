@@ -1,5 +1,7 @@
 import { SCOPE } from '@prisma/client';
+import { Request } from 'express';
 import { ScopeConstraint } from '../decorators/scopes.decorator';
+import { AuditRequestContext } from '../../audit/audit.types';
 
 export interface AuthenticatedScope {
   role: string;
@@ -16,11 +18,9 @@ export interface AuthenticatedUser {
   scopes: AuthenticatedScope[];
 }
 
-export interface AuthenticatedRequest {
+export interface AuthenticatedRequest extends Request {
   user?: AuthenticatedUser;
   acceptedRoles?: string[];
   scopeConstraints?: ScopeConstraint[];
-  body?: Record<string, unknown>;
-  params?: Record<string, unknown>;
-  query?: Record<string, unknown>;
+  audit?: AuditRequestContext;
 }

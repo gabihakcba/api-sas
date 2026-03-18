@@ -1042,6 +1042,17 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
     ],
   },
   {
+    nombre: 'DEV',
+    descripcion:
+      'Perfil tecnico de desarrollo con acceso total para diagnostico, auditoria y mantenimiento del sistema.',
+    permissions: [
+      {
+        actions: [ACTION.MANAGE],
+        resources: ALL_RESOURCES,
+      },
+    ],
+  },
+  {
     nombre: 'PROTAGONISTA',
     descripcion:
       'Acceso personal a su caja y a la caja de la rama segun las reglas de filtrado del backend.',

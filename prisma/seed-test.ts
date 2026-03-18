@@ -532,6 +532,28 @@ async function ensurePago(
       detalles: input.detalles,
     },
   });
+
+  await tx.cuentaDinero.update({
+    where: {
+      id: input.cuentaDestinoId,
+    },
+    data: {
+      monto_actual: {
+        increment: input.monto,
+      },
+    },
+  });
+
+  await tx.cuentaDinero.update({
+    where: {
+      id: input.cuentaOrigenId,
+    },
+    data: {
+      monto_actual: {
+        decrement: input.monto,
+      },
+    },
+  });
 }
 
 async function ensureEvento(

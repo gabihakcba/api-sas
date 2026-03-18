@@ -7,7 +7,6 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
-  Patch,
   Post,
   Query,
   Res,
@@ -21,7 +20,6 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { AuthenticatedRequest } from '../auth/types/auth-request.types';
 import { CreatePagoDto } from './dto/create-pago.dto';
 import { PagosQueryDto } from './dto/pagos-query.dto';
-import { UpdatePagoDto } from './dto/update-pago.dto';
 import { PagosService } from './pagos.service';
 
 @Controller('pagos')
@@ -111,18 +109,7 @@ export class PagosController {
     @Request() req: AuthenticatedRequest,
     @Body() dto: CreatePagoDto,
   ) {
-    return this.pagosService.create(dto, req.user!);
-  }
-
-  @Patch(':id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @CheckPermissions('UPDATE:PAGO')
-  async update(
-    @Request() req: AuthenticatedRequest,
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdatePagoDto,
-  ) {
-    return this.pagosService.update(id, dto, req.user!);
+    return this.pagosService.create(dto, req.user!, req.audit?.logId);
   }
 
   @Delete(':id')
@@ -133,6 +120,6 @@ export class PagosController {
     @Request() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    await this.pagosService.remove(id, req.user!);
+    await this.pagosService.remove(id, req.user!, req.audit?.logId);
   }
 }

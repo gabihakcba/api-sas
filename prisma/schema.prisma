@@ -846,6 +846,9 @@ model Log {
   cuenta    Json
   miembro   Json
   endpoint  String
+  timestamp DateTime @default(now())
+  ip        String?
+  userAgent String?
   createdAt DateTime @default(now())
 
   // Relations
@@ -856,7 +859,7 @@ model Action {
   id             Int      @id @default(autoincrement())
   tabla          String
   pre_registro   Json
-  post_resgistro Json?
+  post_registro  Json?
   createdAt      DateTime @default(now())
 
   // Foreign key

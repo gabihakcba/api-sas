@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { AdultosModule } from './adultos/adultos.module';
+import { AuditModule } from './audit/audit.module';
+import { RequestAuditInterceptor } from './audit/request-audit.interceptor';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -12,6 +15,7 @@ import { CuentasModule } from './cuentas/cuentas.module';
 import { CuentasDineroModule } from './cuentas-dinero/cuentas-dinero.module';
 import { EventosModule } from './eventos/eventos.module';
 import { MetodosPagoModule } from './metodos-pago/metodos-pago.module';
+import { LogsModule } from './logs/logs.module';
 import { PagosModule } from './pagos/pagos.module';
 import { PerfilesModule } from './perfiles/perfiles.module';
 import { PlanFormacionModule } from './plan-formacion/plan-formacion.module';
@@ -29,6 +33,7 @@ import { TiposEventoModule } from './tipos-evento/tipos-evento.module';
       isGlobal: true,
     }),
     PrismaModule,
+    AuditModule,
     CalendarioModule,
     AuthModule,
     ComisionesModule,
@@ -37,6 +42,7 @@ import { TiposEventoModule } from './tipos-evento/tipos-evento.module';
     CuentasModule,
     CuentasDineroModule,
     EventosModule,
+    LogsModule,
     MetodosPagoModule,
     PagosModule,
     PerfilesModule,
@@ -50,6 +56,12 @@ import { TiposEventoModule } from './tipos-evento/tipos-evento.module';
     TiposEventoModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RequestAuditInterceptor,
+    },
+  ],
 })
 export class AppModule {}

@@ -14,17 +14,38 @@ import {
   hasSoftDeleteAuditAccess,
   hasUnrestrictedAccess,
 } from '../auth/utils/unrestricted-access.util';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { CreatePagoDto } from './dto/create-pago.dto';
 import { PagosQueryDto } from './dto/pagos-query.dto';
-import { UpdatePagoDto } from './dto/update-pago.dto';
 
 type VisibleCuenta = {
   id: number;
   nombre: string;
   monto_actual: Prisma.Decimal;
 };
+
+interface PagoAuditSnapshot {
+  id: number;
+  borrado: boolean;
+  monto: string;
+  detalles: string | null;
+  fecha_pago: Date;
+  createdAt: Date;
+  codigo_validacion: string;
+  miembro: unknown;
+  responsable: unknown;
+  metodoPago: unknown;
+  conceptoPago: unknown;
+  cuentaDinero: unknown;
+  cuentaOrigen: unknown;
+  evento: unknown;
+  comprobante: {
+    mime: string | null;
+    nombre: string | null;
+  };
+}
 
 const ADULT_SCOPED_ROLES = new Set([
   'JEFATURA_RAMA',
@@ -37,6 +58,7 @@ export class PagosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scopeFilterService: ScopeFilterService,
+    private readonly auditService: AuditService,
   ) {}
 
   private readonly createOrUpdatePagoInput!: {
@@ -280,11 +302,14 @@ export class PagosService {
     };
   }
 
-  async create(dto: CreatePagoDto, user: AuthenticatedUser) {
+  async create(
+    dto: CreatePagoDto,
+    user: AuthenticatedUser,
+    logId?: number,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const data = await this.resolvePagoData(tx, dto, user);
 
-      await this.ensureCanRevertDestination(tx, data.idCuentaDinero, 0);
       await this.applyPagoImpact(
         tx,
         {
@@ -316,93 +341,26 @@ export class PagosService {
         },
       });
 
-      return this.findOneWithinClient(tx, created.id, user);
-    });
-  }
+      const createdPago = await this.findOneWithinClient(tx, created.id, user);
 
-  async update(id: number, dto: UpdatePagoDto, user: AuthenticatedUser) {
-    const existing = await this.findOne(id, user);
+      if (!createdPago) {
+        throw new NotFoundException('El pago creado no pudo recuperarse.');
+      }
 
-    return this.prisma.$transaction(async (tx) => {
-      const resolved = await this.resolvePagoData(
-        tx,
-        {
-          monto: dto.monto ?? Number(existing.monto),
-          detalles: dto.detalles ?? existing.detalles ?? undefined,
-          fechaPago: dto.fechaPago ?? new Date(existing.fecha_pago),
-          idCuentaDinero: dto.idCuentaDinero ?? existing.CuentaDinero.id,
-          idCuentaOrigen:
-            dto.idCuentaOrigen !== undefined
-              ? dto.idCuentaOrigen
-              : (existing.CuentaOrigen?.id ?? undefined),
-          idMetodoPago: dto.idMetodoPago ?? existing.MetodoPago.id,
-          idConceptoPago: dto.idConceptoPago ?? existing.ConceptoPago.id,
-          idMiembro: dto.idMiembro ?? existing.Miembro.id,
-          idEvento:
-            dto.idEvento !== undefined
-              ? dto.idEvento
-              : (existing.Evento?.id ?? undefined),
-          comprobantePagoBase64:
-            dto.comprobantePagoBase64 !== undefined
-              ? dto.comprobantePagoBase64
-              : undefined,
-          comprobantePagoMimeType:
-            dto.comprobantePagoMimeType !== undefined
-              ? dto.comprobantePagoMimeType
-              : undefined,
-          comprobantePagoNombre:
-            dto.comprobantePagoNombre !== undefined
-              ? dto.comprobantePagoNombre
-              : undefined,
-        },
-        user,
-      );
-
-      await this.applyPagoImpact(
-        tx,
-        {
-          monto: new Prisma.Decimal(existing.monto),
-          idCuentaDinero: existing.CuentaDinero.id,
-          idCuentaOrigen: existing.CuentaOrigen?.id ?? null,
-        },
-        'revert',
-      );
-
-      await this.applyPagoImpact(
-        tx,
-        {
-          monto: resolved.monto,
-          idCuentaDinero: resolved.idCuentaDinero,
-          idCuentaOrigen: resolved.idCuentaOrigen,
-        },
-        'apply',
-      );
-
-      await tx.pago.update({
-        where: { id },
-        data: {
-          monto: resolved.monto,
-          detalles: resolved.detalles,
-          comprobante_pago: resolved.comprobantePago,
-          comprobante_pago_mime: resolved.comprobantePagoMimeType,
-          comprobante_pago_nombre: resolved.comprobantePagoNombre,
-          fecha_pago: resolved.fechaPago,
-          id_cuenta_dinero: resolved.idCuentaDinero,
-          id_cuenta_origen: resolved.idCuentaOrigen,
-          id_metodo_pago: resolved.idMetodoPago,
-          id_concepto_pago: resolved.idConceptoPago,
-          id_miembro: resolved.idMiembro,
-          id_responsable: resolved.idResponsable,
-          id_evento: resolved.idEvento,
-        },
+      await this.auditService.recordAction({
+        logId,
+        tabla: 'Pago',
+        preRegistro: null,
+        postRegistro: this.toPagoAuditSnapshot(createdPago),
       });
 
-      return this.findOneWithinClient(tx, id, user);
+      return createdPago;
     });
   }
 
-  async remove(id: number, user: AuthenticatedUser) {
+  async remove(id: number, user: AuthenticatedUser, logId?: number) {
     const existing = await this.findOne(id, user);
+    const preRegistro = this.toPagoAuditSnapshot(existing);
 
     await this.prisma.$transaction(async (tx) => {
       await this.applyPagoImpact(
@@ -421,6 +379,16 @@ export class PagosService {
           borrado: true,
         },
       });
+    });
+
+    await this.auditService.recordAction({
+      logId,
+      tabla: 'Pago',
+      preRegistro,
+      postRegistro: this.auditService.sanitizePayload({
+        ...preRegistro,
+        borrado: true,
+      }),
     });
   }
 
@@ -818,14 +786,6 @@ export class PagosService {
     },
     mode: 'apply' | 'revert',
   ) {
-    if (mode === 'revert') {
-      await this.ensureCanRevertDestination(
-        tx,
-        input.idCuentaDinero,
-        input.monto,
-      );
-    }
-
     if (mode === 'apply' && input.idCuentaOrigen) {
       await this.ensureCanDebitOrigin(tx, input.idCuentaOrigen, input.monto);
     }
@@ -898,35 +858,6 @@ export class PagosService {
     if (cuenta.monto_actual.lt(monto)) {
       throw new ConflictException(
         'La cuenta de origen no tiene saldo suficiente para esta operación.',
-      );
-    }
-  }
-
-  private async ensureCanRevertDestination(
-    tx: Prisma.TransactionClient,
-    idCuenta: number,
-    monto: Prisma.Decimal | number,
-  ) {
-    const amount =
-      typeof monto === 'number' ? new Prisma.Decimal(monto) : monto;
-    const cuenta = await tx.cuentaDinero.findFirst({
-      where: {
-        id: idCuenta,
-        borrado: false,
-      },
-      select: {
-        id: true,
-        monto_actual: true,
-      },
-    });
-
-    if (!cuenta) {
-      throw new NotFoundException('La cuenta de destino indicada no existe.');
-    }
-
-    if (cuenta.monto_actual.lt(amount)) {
-      throw new ConflictException(
-        'La cuenta de destino no tiene saldo suficiente para revertir esta operación.',
       );
     }
   }
@@ -1550,6 +1481,31 @@ export class PagosService {
     return {
       ...where,
       ...(includeDeleted ? {} : { borrado: false }),
+    };
+  }
+
+  private toPagoAuditSnapshot(
+    pago: Awaited<ReturnType<PagosService['findOne']>>,
+  ): PagoAuditSnapshot {
+    return {
+      id: pago.id,
+      borrado: pago.borrado ?? false,
+      monto: String(pago.monto),
+      detalles: pago.detalles,
+      fecha_pago: pago.fecha_pago,
+      createdAt: pago.createdAt,
+      codigo_validacion: pago.codigo_validacion,
+      miembro: pago.Miembro,
+      responsable: pago.Responsable,
+      metodoPago: pago.MetodoPago,
+      conceptoPago: pago.ConceptoPago,
+      cuentaDinero: pago.CuentaDinero,
+      cuentaOrigen: pago.CuentaOrigen,
+      evento: pago.Evento,
+      comprobante: {
+        mime: pago.comprobante_pago_mime,
+        nombre: pago.comprobante_pago_nombre,
+      },
     };
   }
 }
