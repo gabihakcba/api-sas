@@ -6,6 +6,7 @@ import {
 import { Prisma, SCOPE } from '@prisma/client';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
+import { hasSoftDeleteAuditAccess } from '../auth/utils/unrestricted-access.util';
 import { CuentasService } from '../cuentas/cuentas.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdultosQueryDto } from './dto/adultos-query.dto';
@@ -25,12 +26,14 @@ export class AdultosService {
     const page = paginationQuery.page ?? 1;
     const limit = paginationQuery.limit ?? 10;
     const skip = (page - 1) * limit;
+    const includeDeleted =
+      paginationQuery.includeDeleted === true && hasSoftDeleteAuditAccess(user);
     const searchTerm = paginationQuery.q?.trim();
 
     const scopeWhere = await this.getAdultScopeWhere(user);
     const where = this.scopeFilterService.mergeWhere(
       {
-        borrado: false,
+        ...(includeDeleted ? {} : { borrado: false }),
         ...(paginationQuery.esBecado !== undefined
           ? { es_becado: paginationQuery.esBecado }
           : {}),
@@ -38,7 +41,7 @@ export class AdultosService {
           ? { activo: paginationQuery.activo }
           : {}),
         Miembro: {
-          borrado: false,
+          ...(includeDeleted ? {} : { borrado: false }),
           ...(searchTerm
             ? {
                 OR: [
@@ -132,6 +135,7 @@ export class AdultosService {
           id: true,
           es_becado: true,
           activo: true,
+          borrado: true,
           Miembro: {
             select: {
               id: true,
@@ -140,6 +144,7 @@ export class AdultosService {
               dni: true,
               email: true,
               telefono: true,
+              borrado: true,
               Cuenta: {
                 select: {
                   id: true,

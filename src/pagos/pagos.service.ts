@@ -10,7 +10,10 @@ import * as path from 'node:path';
 import { Prisma, SCOPE } from '@prisma/client';
 import PDFDocument = require('pdfkit');
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
-import { hasUnrestrictedAccess } from '../auth/utils/unrestricted-access.util';
+import {
+  hasSoftDeleteAuditAccess,
+  hasUnrestrictedAccess,
+} from '../auth/utils/unrestricted-access.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { CreatePagoDto } from './dto/create-pago.dto';
@@ -55,11 +58,13 @@ export class PagosService {
     const page = paginationQuery.page ?? 1;
     const limit = paginationQuery.limit ?? 10;
     const skip = (page - 1) * limit;
+    const includeDeleted =
+      paginationQuery.includeDeleted === true && hasSoftDeleteAuditAccess(user);
     const searchTerm = paginationQuery.q?.trim();
 
     const where = this.scopeFilterService.mergeWhere(
-      {
-        borrado: false,
+      this.buildVisiblePagoWhere(
+        {
         ...(paginationQuery.idConceptoPago
           ? { id_concepto_pago: paginationQuery.idConceptoPago }
           : {}),
@@ -146,7 +151,9 @@ export class PagosService {
               ],
             }
           : {}),
-      },
+        },
+        includeDeleted,
+      ),
       this.scopeFilterService.forPagos(user),
     );
 
@@ -420,6 +427,7 @@ export class PagosService {
   private pagoSelect() {
     return {
       id: true,
+      borrado: true,
       monto: true,
       detalles: true,
       comprobante_pago_mime: true,
@@ -479,10 +487,7 @@ export class PagosService {
   async getAttachedReceipt(id: number, user: AuthenticatedUser) {
     const pago = await this.prisma.pago.findFirst({
       where: this.scopeFilterService.mergeWhere(
-        {
-          id,
-          borrado: false,
-        },
+        this.buildVisiblePagoWhere({ id }),
         this.scopeFilterService.forPagos(user),
       ),
       select: {
@@ -510,10 +515,7 @@ export class PagosService {
   async getWhatsappShareData(id: number, user: AuthenticatedUser) {
     const pago = await this.prisma.pago.findFirst({
       where: this.scopeFilterService.mergeWhere(
-        {
-          id,
-          borrado: false,
-        },
+        this.buildVisiblePagoWhere({ id }),
         this.scopeFilterService.forPagos(user),
       ),
       select: {
@@ -612,10 +614,7 @@ export class PagosService {
   ) {
     return client.pago.findFirst({
       where: this.scopeFilterService.mergeWhere(
-        {
-          id,
-          borrado: false,
-        },
+        this.buildVisiblePagoWhere({ id }),
         this.scopeFilterService.forPagos(user),
       ),
       select: this.pagoSelect(),
@@ -1542,5 +1541,15 @@ export class PagosService {
     }
 
     return `549${digits}`;
+  }
+
+  private buildVisiblePagoWhere(
+    where: Prisma.PagoWhereInput = {},
+    includeDeleted = false,
+  ): Prisma.PagoWhereInput {
+    return {
+      ...where,
+      ...(includeDeleted ? {} : { borrado: false }),
+    };
   }
 }

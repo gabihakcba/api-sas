@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, SCOPE } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
-import { hasUnrestrictedAccess } from '../auth/utils/unrestricted-access.util';
+import {
+  hasSoftDeleteAuditAccess,
+  hasUnrestrictedAccess,
+} from '../auth/utils/unrestricted-access.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { ComisionesQueryDto } from './dto/comisiones-query.dto';
 import { CreateComisionDto } from './dto/create-comision.dto';
@@ -19,8 +22,10 @@ export class ComisionesService {
     const trimmedQuery = query.q?.trim();
     const numericQuery =
       trimmedQuery && /^\d+$/.test(trimmedQuery) ? Number(trimmedQuery) : null;
+    const includeDeleted =
+      query.includeDeleted === true && hasSoftDeleteAuditAccess(user);
     const where: Prisma.ComisionWhereInput = {
-      borrado: false,
+      ...(includeDeleted ? {} : { borrado: false }),
       ...this.buildComisionScopeWhere(user),
       ...(trimmedQuery
         ? {
@@ -441,6 +446,7 @@ export class ComisionesService {
   private comisionSelect() {
     return {
       id: true,
+      borrado: true,
       nombre: true,
       descripcion: true,
       Evento: {

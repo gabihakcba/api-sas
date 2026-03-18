@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, SCOPE } from '@prisma/client';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
+import { hasSoftDeleteAuditAccess } from '../auth/utils/unrestricted-access.util';
 import { CuentasService } from '../cuentas/cuentas.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateResponsableDto } from './dto/create-responsable.dto';
@@ -21,13 +22,15 @@ export class ResponsablesService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
+    const includeDeleted =
+      query.includeDeleted === true && hasSoftDeleteAuditAccess(user);
     const searchTerm = query.q?.trim();
 
     const where = this.scopeFilterService.mergeWhere(
       {
-        borrado: false,
+        ...(includeDeleted ? {} : { borrado: false }),
         Miembro: {
-          borrado: false,
+          ...(includeDeleted ? {} : { borrado: false }),
           ...(searchTerm
             ? {
                 OR: [
@@ -623,6 +626,7 @@ export class ResponsablesService {
   private responsableListSelect() {
     return {
       id: true,
+      borrado: true,
       Miembro: {
         select: {
           id: true,
@@ -631,6 +635,7 @@ export class ResponsablesService {
           dni: true,
           email: true,
           telefono: true,
+          borrado: true,
           Cuenta: {
             select: {
               id: true,

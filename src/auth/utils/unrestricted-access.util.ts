@@ -19,6 +19,12 @@ const GROUP_UNRESTRICTED_SCOPE_TYPES = new Set<SCOPE>([
   SCOPE.GRUPO,
   SCOPE.GLOBAL,
 ]);
+const GROUP_SOFT_DELETE_AUDIT_ROLES = new Set([
+  'ADM',
+  'DEV',
+  'JEFATURA',
+  'SECRETARIA_TESORERIA',
+]);
 const ALWAYS_UNRESTRICTED_SCOPE_TYPES = new Set<SCOPE>([
   SCOPE.OWN,
   SCOPE.GLOBAL,
@@ -48,3 +54,12 @@ export const hasUnrestrictedAccess = (
 
     return false;
   });
+
+export const hasSoftDeleteAuditAccess = (
+  user: Pick<AuthenticatedUser, 'scopes'>,
+): boolean =>
+  user.scopes.some(
+    (scope) =>
+      GROUP_SOFT_DELETE_AUDIT_ROLES.has(scope.role) &&
+      GROUP_UNRESTRICTED_SCOPE_TYPES.has(scope.scopeType),
+  );

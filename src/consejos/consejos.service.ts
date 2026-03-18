@@ -8,6 +8,7 @@ import {
 import { ESTADO_TEMARIO, Prisma } from '@prisma/client';
 import PDFDocument = require('pdfkit');
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
+import { hasSoftDeleteAuditAccess } from '../auth/utils/unrestricted-access.util';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateConsejoDto } from './dto/create-consejo.dto';
@@ -94,11 +95,13 @@ export class ConsejosService {
     const page = paginationQuery.page ?? 1;
     const limit = paginationQuery.limit ?? 10;
     const skip = (page - 1) * limit;
+    const includeDeleted =
+      paginationQuery.includeDeleted === true && hasSoftDeleteAuditAccess(user);
 
     const [data, total] = await this.prisma.$transaction([
       this.prisma.consejo.findMany({
         where: {
-          borrado: false,
+          ...(includeDeleted ? {} : { borrado: false }),
         },
         skip,
         take: limit,
@@ -107,7 +110,7 @@ export class ConsejosService {
       }),
       this.prisma.consejo.count({
         where: {
-          borrado: false,
+          ...(includeDeleted ? {} : { borrado: false }),
         },
       }),
     ]);
@@ -524,6 +527,7 @@ export class ConsejosService {
 
     return {
       id: true,
+      borrado: true,
       nombre: true,
       descripcion: true,
       fecha: true,

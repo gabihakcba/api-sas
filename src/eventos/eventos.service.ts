@@ -7,6 +7,7 @@ import { Prisma, SCOPE } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import {
   hasScopedRoleAccess,
+  hasSoftDeleteAuditAccess,
   hasUnrestrictedAccess,
 } from '../auth/utils/unrestricted-access.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -29,9 +30,11 @@ export class EventosService {
     const trimmedQuery = query.q?.trim();
     const numericQuery =
       trimmedQuery && /^\d+$/.test(trimmedQuery) ? Number(trimmedQuery) : null;
+    const includeDeleted =
+      query.includeDeleted === true && hasSoftDeleteAuditAccess(user);
     const where = this.mergeEventoWhere(
       {
-        borrado: false,
+        ...(includeDeleted ? {} : { borrado: false }),
         ...(trimmedQuery
           ? {
               OR: [
@@ -171,6 +174,7 @@ export class EventosService {
       orderBy: [{ fecha_inicio: 'asc' }, { nombre: 'asc' }],
       select: {
         id: true,
+        borrado: true,
         nombre: true,
         descripcion: true,
         fecha_inicio: true,
