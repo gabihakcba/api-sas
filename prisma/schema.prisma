@@ -908,6 +908,16 @@ model Action {
   Log Log @relation(fields: [id_log], references: [id], name: "ActionLog")
 }
 
+model ConfiguracionGrupo {
+  id           Int      @id @default(1)
+  nombre_grupo String   @default("Grupo Scout")
+  url_logo     String?
+  url_favicon  String?
+  theme_web    String   @default("lara-light-blue")
+  theme_mobile String   @default("md3-light")
+  updatedAt    DateTime @updatedAt
+}
+
 //
 // Tablas para permisos y roles
 // @Role
@@ -965,6 +975,7 @@ enum RESOURCE {
   PLAN_DESEMPENO
   ADJUNTO_FORMACION
   CICLO_PROGRAMA
+  CONFIGURACION_GRUPO
 }
 
 model Permission {

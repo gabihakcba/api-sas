@@ -1192,6 +1192,8 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
 ];
 
 const ADMIN_DNI = '00000000';
+const DEFAULT_GROUP_NAME =
+  process.env.GRUPO_NOMBRE?.trim() || 'Grupo Scout Adalberto O. Lopez 494';
 
 function getRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -2047,6 +2049,18 @@ async function main() {
     await seedRelaciones(tx);
     await seedPlanesFormacionTemplate(tx);
     await seedCuentasDineroBase(tx);
+    await tx.configuracionGrupo.upsert({
+      where: { id: 1 },
+      update: {},
+    create: {
+      id: 1,
+      nombre_grupo: DEFAULT_GROUP_NAME,
+      url_logo: '/logo.png',
+      url_favicon: '/favicon.ico',
+      theme_web: 'lara-light-blue',
+      theme_mobile: 'md3-light',
+    },
+  });
     await seedAdminAccount(tx, roleIdByName);
   });
 

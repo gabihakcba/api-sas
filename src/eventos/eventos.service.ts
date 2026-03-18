@@ -85,38 +85,39 @@ export class EventosService {
   }
 
   async getOptions(user: AuthenticatedUser) {
-    const [tipos, areas, ramas, miembros, comisiones] = await this.prisma.$transaction([
-      this.prisma.tipoEvento.findMany({
-        where: { borrado: false },
-        orderBy: { nombre: 'asc' },
-        select: { id: true, nombre: true },
-      }),
-      this.prisma.area.findMany({
-        where: { borrado: false },
-        orderBy: { nombre: 'asc' },
-        select: { id: true, nombre: true },
-      }),
-      this.prisma.rama.findMany({
-        where: { borrado: false },
-        orderBy: { nombre: 'asc' },
-        select: { id: true, nombre: true, id_area: true },
-      }),
-      this.prisma.miembro.findMany({
-        where: this.buildVisibleMiembroWhere(user),
-        orderBy: [{ apellidos: 'asc' }, { nombre: 'asc' }],
-        select: {
-          id: true,
-          nombre: true,
-          apellidos: true,
-          dni: true,
-        },
-      }),
-      this.prisma.comision.findMany({
-        where: { borrado: false },
-        orderBy: { nombre: 'asc' },
-        select: { id: true, nombre: true, id_evento: true },
-      }),
-    ]);
+    const [tipos, areas, ramas, miembros, comisiones] =
+      await this.prisma.$transaction([
+        this.prisma.tipoEvento.findMany({
+          where: { borrado: false },
+          orderBy: { nombre: 'asc' },
+          select: { id: true, nombre: true },
+        }),
+        this.prisma.area.findMany({
+          where: { borrado: false },
+          orderBy: { nombre: 'asc' },
+          select: { id: true, nombre: true },
+        }),
+        this.prisma.rama.findMany({
+          where: { borrado: false },
+          orderBy: { nombre: 'asc' },
+          select: { id: true, nombre: true, id_area: true },
+        }),
+        this.prisma.miembro.findMany({
+          where: this.buildVisibleMiembroWhere(user),
+          orderBy: [{ apellidos: 'asc' }, { nombre: 'asc' }],
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+            dni: true,
+          },
+        }),
+        this.prisma.comision.findMany({
+          where: { borrado: false },
+          orderBy: { nombre: 'asc' },
+          select: { id: true, nombre: true, id_evento: true },
+        }),
+      ]);
 
     return { tipos, areas, ramas, miembros, comisiones };
   }
@@ -171,7 +172,8 @@ export class EventosService {
               }
             : {}),
         },
-        user.roles.includes('PROTAGONISTA') || user.roles.includes('RESPONSABLE')
+        user.roles.includes('PROTAGONISTA') ||
+          user.roles.includes('RESPONSABLE')
           ? this.buildEventoScopeWhere(user)
           : undefined,
       ),
@@ -235,7 +237,10 @@ export class EventosService {
   }
 
   async create(dto: CreateEventoDto, user: AuthenticatedUser) {
-    const normalizedAfectaciones = await this.resolveCreateAfectaciones(dto, user);
+    const normalizedAfectaciones = await this.resolveCreateAfectaciones(
+      dto,
+      user,
+    );
     this.validateDates(dto.fechaInicio, dto.fechaFin);
     await this.ensureTipoExists(dto.idTipo);
     await this.ensureAreasExist(normalizedAfectaciones.areaIds);
@@ -264,10 +269,14 @@ export class EventosService {
         id_tipo: dto.idTipo,
         id_ciclo_programa: idCicloPrograma,
         AreaAfectada: {
-          create: normalizedAfectaciones.areaIds.map((idArea) => ({ id_area: idArea })),
+          create: normalizedAfectaciones.areaIds.map((idArea) => ({
+            id_area: idArea,
+          })),
         },
         RamaAfectada: {
-          create: normalizedAfectaciones.ramaIds.map((idRama) => ({ id_rama: idRama })),
+          create: normalizedAfectaciones.ramaIds.map((idRama) => ({
+            id_rama: idRama,
+          })),
         },
       },
       select: { id: true },
@@ -338,9 +347,13 @@ export class EventosService {
           ...(dto.descripcion !== undefined
             ? { descripcion: dto.descripcion.trim() || null }
             : {}),
-          ...(dto.fechaInicio !== undefined ? { fecha_inicio: dto.fechaInicio } : {}),
+          ...(dto.fechaInicio !== undefined
+            ? { fecha_inicio: dto.fechaInicio }
+            : {}),
           ...(dto.fechaFin !== undefined ? { fecha_fin: dto.fechaFin } : {}),
-          ...(dto.lugar !== undefined ? { lugar: dto.lugar.trim() || null } : {}),
+          ...(dto.lugar !== undefined
+            ? { lugar: dto.lugar.trim() || null }
+            : {}),
           ...(dto.terminado !== undefined ? { terminado: dto.terminado } : {}),
           ...(dto.costoMp !== undefined
             ? { costo_mp: new Prisma.Decimal(dto.costoMp) }
@@ -382,7 +395,10 @@ export class EventosService {
         borrado: false,
         Miembro: this.buildVisibleMiembroWhere(user),
       },
-      orderBy: [{ Miembro: { apellidos: 'asc' } }, { Miembro: { nombre: 'asc' } }],
+      orderBy: [
+        { Miembro: { apellidos: 'asc' } },
+        { Miembro: { nombre: 'asc' } },
+      ],
       select: {
         id: true,
         descripcion: true,
@@ -427,7 +443,9 @@ export class EventosService {
         },
       });
 
-      const existingMap = new Map(existing.map((item) => [item.id_miembro, item]));
+      const existingMap = new Map(
+        existing.map((item) => [item.id_miembro, item]),
+      );
 
       for (const miembroId of dto.miembroIds) {
         const current = existingMap.get(miembroId);
@@ -910,7 +928,11 @@ export class EventosService {
     dto: CreateEventoDto,
     user: AuthenticatedUser,
   ): Promise<{ areaIds: number[]; ramaIds: number[] }> {
-    return this.resolveScopedAfectaciones(user, dto.areaIds ?? [], dto.ramaIds ?? []);
+    return this.resolveScopedAfectaciones(
+      user,
+      dto.areaIds ?? [],
+      dto.ramaIds ?? [],
+    );
   }
 
   private async resolveScopedAfectaciones(
@@ -975,7 +997,9 @@ export class EventosService {
     };
   }
 
-  private buildVisibleMiembroWhere(user: AuthenticatedUser): Prisma.MiembroWhereInput {
+  private buildVisibleMiembroWhere(
+    user: AuthenticatedUser,
+  ): Prisma.MiembroWhereInput {
     if (hasUnrestrictedAccess(user)) {
       return {
         borrado: false,

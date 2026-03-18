@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { json, urlencoded } from 'express';
+import { json, static as expressStatic, urlencoded } from 'express';
+import * as path from 'path';
 import { AppModule } from './app.module';
 
 function normalizeOrigin(value: string): string {
@@ -36,6 +37,7 @@ async function bootstrap() {
 
   app.use(json({ limit: bodySizeLimit }));
   app.use(urlencoded({ extended: true, limit: bodySizeLimit }));
+  app.use(expressStatic(path.resolve(process.cwd(), 'public')));
 
   app.useGlobalPipes(
     new ValidationPipe({

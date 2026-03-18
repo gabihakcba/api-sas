@@ -1089,6 +1089,8 @@ export class PagosService {
       posicion: string | null;
     } | null,
   ): Promise<Buffer> {
+    const branding = await this.getBrandingPdfConfig();
+
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       const doc = new PDFDocument({
@@ -1106,7 +1108,6 @@ export class PagosService {
         doc.page.width - doc.page.margins.left - doc.page.margins.right;
       const height =
         doc.page.height - doc.page.margins.top - doc.page.margins.bottom;
-      const logoPath = this.resolveScoutLogoPath();
 
       doc
         .lineWidth(1)
@@ -1114,15 +1115,15 @@ export class PagosService {
         .rect(left, top, width, height)
         .stroke();
 
-      if (logoPath) {
-        doc.image(logoPath, left + 18, top + 18, { fit: [44, 44] });
+      if (branding.logoPath) {
+        doc.image(branding.logoPath, left + 18, top + 18, { fit: [44, 44] });
       }
 
       doc
         .fillColor('#111827')
         .font('Helvetica-Bold')
         .fontSize(16)
-        .text('Grupo Scout Adalberto Lopez', left + 72, top + 24);
+        .text(branding.groupName, left + 72, top + 24);
 
       doc
         .font('Helvetica')
@@ -1294,14 +1295,31 @@ export class PagosService {
     });
   }
 
-  private resolveScoutLogoPath() {
-    const candidates = [
-      path.resolve(process.cwd(), 'public/scout_logo.png'),
-      path.resolve(process.cwd(), '../front-sas/public/scout_logo.png'),
-      path.resolve(process.cwd(), '../public/scout_logo.png'),
-    ];
+  private async getBrandingPdfConfig() {
+    const config = await this.prisma.configuracionGrupo.findFirst({
+      where: { id: 1 },
+      select: {
+        nombre_grupo: true,
+        url_logo: true,
+      },
+    });
 
-    return candidates.find((candidate) => existsSync(candidate));
+    const defaultLogoPath = path.resolve(process.cwd(), 'public/logo.png');
+    const configuredLogoPath =
+      config?.url_logo && config.url_logo.startsWith('/')
+        ? path.resolve(process.cwd(), 'public', config.url_logo.replace(/^\/+/, ''))
+        : null;
+
+    return {
+      groupName:
+        config?.nombre_grupo?.trim() || 'Grupo Scout Adalberto O. Lopez 494',
+      logoPath:
+        configuredLogoPath && existsSync(configuredLogoPath)
+          ? configuredLogoPath
+          : existsSync(defaultLogoPath)
+            ? defaultLogoPath
+            : null,
+    };
   }
 
   private async getResponsableFirma(idMiembro: number) {
