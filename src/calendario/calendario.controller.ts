@@ -10,6 +10,12 @@ import { CalendarRangeQueryDto } from './dto/calendar-range-query.dto';
 export class CalendarioController {
   constructor(private readonly calendarioService: CalendarioService) {}
 
+  @Get('consejos')
+  @UseGuards(JwtAuthGuard)
+  async getConsejos(@Query() query: CalendarRangeQueryDto) {
+    return this.calendarioService.getConsejos(query.from, query.to);
+  }
+
   @Get('cumpleanios')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @CheckPermissions('READ:EVENTO')

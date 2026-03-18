@@ -32,7 +32,7 @@ function parseAllowedOrigins(value: string | undefined): string[] {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
-  const bodySizeLimit = process.env.BODY_SIZE_LIMIT?.trim() || '15mb';
+  const bodySizeLimit = process.env.BODY_SIZE_LIMIT?.trim() || '64mb';
 
   app.use(json({ limit: bodySizeLimit }));
   app.use(urlencoded({ extended: true, limit: bodySizeLimit }));

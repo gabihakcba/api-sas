@@ -6,25 +6,36 @@ import { PrismaService } from '../prisma/prisma.service';
 export class CalendarioService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getConsejos(fromValue: string, toValue: string) {
+    const { from, to } = this.parseDateRange(fromValue, toValue);
+
+    return this.prisma.consejo.findMany({
+      where: {
+        borrado: false,
+        fecha: {
+          gte: from,
+          lte: to,
+        },
+      },
+      orderBy: [{ fecha: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        nombre: true,
+        descripcion: true,
+        fecha: true,
+        es_ordinario: true,
+        hora_inicio: true,
+        hora_fin: true,
+      },
+    });
+  }
+
   async getCumpleanios(
     user: AuthenticatedUser,
     fromValue: string,
     toValue: string,
   ) {
-    const from = new Date(fromValue);
-    const to = new Date(toValue);
-
-    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-      throw new BadRequestException(
-        'Debes indicar un rango de fechas válido para el calendario.',
-      );
-    }
-
-    if (to < from) {
-      throw new BadRequestException(
-        'La fecha final del calendario no puede ser anterior a la inicial.',
-      );
-    }
+    const { from, to } = this.parseDateRange(fromValue, toValue);
 
     const miembros = await this.prisma.miembro.findMany({
       where: this.buildBirthdayWhere(user),
@@ -170,6 +181,25 @@ export class CalendarioService {
 
   private isLeapYear(year: number) {
     return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  }
+
+  private parseDateRange(fromValue: string, toValue: string) {
+    const from = new Date(fromValue);
+    const to = new Date(toValue);
+
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      throw new BadRequestException(
+        'Debes indicar un rango de fechas válido para el calendario.',
+      );
+    }
+
+    if (to < from) {
+      throw new BadRequestException(
+        'La fecha final del calendario no puede ser anterior a la inicial.',
+      );
+    }
+
+    return { from, to };
   }
 
   private buildBirthdayWhere(user: AuthenticatedUser) {
