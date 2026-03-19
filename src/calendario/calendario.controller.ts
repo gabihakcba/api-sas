@@ -29,4 +29,17 @@ export class CalendarioController {
       query.to,
     );
   }
+
+  @Get('reuniones')
+  @UseGuards(JwtAuthGuard)
+  async getReuniones(
+    @Request() req: AuthenticatedRequest,
+    @Query() query: CalendarRangeQueryDto,
+  ) {
+    return this.calendarioService.getReuniones(
+      req.user!,
+      query.from,
+      query.to,
+    );
+  }
 }

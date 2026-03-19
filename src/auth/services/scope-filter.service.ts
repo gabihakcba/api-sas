@@ -164,10 +164,7 @@ export class ScopeFilterService {
         });
       }
 
-      if (
-        scope.scopeType === SCOPE.AREA &&
-        AREA_SCOPE_ROLES.has(scope.role)
-      ) {
+      if (scope.scopeType === SCOPE.AREA && AREA_SCOPE_ROLES.has(scope.role)) {
         filters.push({
           Miembro: {
             MiembroRama: {
@@ -289,10 +286,7 @@ export class ScopeFilterService {
         });
       }
 
-      if (
-        scope.scopeType === SCOPE.AREA &&
-        AREA_SCOPE_ROLES.has(scope.role)
-      ) {
+      if (scope.scopeType === SCOPE.AREA && AREA_SCOPE_ROLES.has(scope.role)) {
         filters.push({
           Responsabilidad: {
             some: {

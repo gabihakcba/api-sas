@@ -27,6 +27,7 @@ import { RamasModule } from './ramas/ramas.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { RelacionesModule } from './relaciones/relaciones.module';
 import { ResponsablesModule } from './responsables/responsables.module';
+import { ReunionesModule } from './reuniones/reuniones.module';
 import { TiposEventoModule } from './tipos-evento/tipos-evento.module';
 
 @Module({
@@ -57,6 +58,7 @@ import { TiposEventoModule } from './tipos-evento/tipos-evento.module';
     RealtimeModule,
     RelacionesModule,
     ResponsablesModule,
+    ReunionesModule,
     TiposEventoModule,
   ],
   controllers: [AppController],

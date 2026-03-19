@@ -18,7 +18,10 @@ export class ProtagonistasService {
     private readonly scopeFilterService: ScopeFilterService,
   ) {}
 
-  async findAll(user: AuthenticatedUser, paginationQuery: ProtagonistasQueryDto) {
+  async findAll(
+    user: AuthenticatedUser,
+    paginationQuery: ProtagonistasQueryDto,
+  ) {
     const page = paginationQuery.page ?? 1;
     const limit = paginationQuery.limit ?? 10;
     const skip = (page - 1) * limit;

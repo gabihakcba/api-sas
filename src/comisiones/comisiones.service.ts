@@ -81,7 +81,10 @@ export class ComisionesService {
             borrado: false,
           },
         },
-        orderBy: [{ Miembro: { apellidos: 'asc' } }, { Miembro: { nombre: 'asc' } }],
+        orderBy: [
+          { Miembro: { apellidos: 'asc' } },
+          { Miembro: { nombre: 'asc' } },
+        ],
         select: {
           id: true,
           Miembro: {
@@ -168,7 +171,10 @@ export class ComisionesService {
           },
         },
       },
-      orderBy: [{ Miembro: { apellidos: 'asc' } }, { Miembro: { nombre: 'asc' } }],
+      orderBy: [
+        { Miembro: { apellidos: 'asc' } },
+        { Miembro: { nombre: 'asc' } },
+      ],
       select: {
         id: true,
         fecha_inicio: true,
@@ -214,7 +220,9 @@ export class ComisionesService {
         },
       });
 
-      const existingMap = new Map(existing.map((item) => [item.id_miembro, item]));
+      const existingMap = new Map(
+        existing.map((item) => [item.id_miembro, item]),
+      );
 
       for (const miembroId of dto.miembroIds) {
         const current = existingMap.get(miembroId);
@@ -479,7 +487,10 @@ export class ComisionesService {
             borrado: false,
           },
         },
-        orderBy: [{ Miembro: { apellidos: 'asc' } }, { Miembro: { nombre: 'asc' } }],
+        orderBy: [
+          { Miembro: { apellidos: 'asc' } },
+          { Miembro: { nombre: 'asc' } },
+        ],
         select: {
           id: true,
           fecha_inicio: true,

@@ -112,8 +112,12 @@ export class ConsejoRealtimeService {
     }
 
     const state = this.getOrCreateState(idConsejo, consejo);
-    state.raisedHands = state.raisedHands.filter((item) => item.memberId !== memberId);
-    state.speakers = state.speakers.filter((item) => item.memberId !== memberId);
+    state.raisedHands = state.raisedHands.filter(
+      (item) => item.memberId !== memberId,
+    );
+    state.speakers = state.speakers.filter(
+      (item) => item.memberId !== memberId,
+    );
     state.speakers.unshift({
       memberId,
       fullName: `${attendance.Miembro.apellidos}, ${attendance.Miembro.nombre}`,
@@ -131,7 +135,9 @@ export class ConsejoRealtimeService {
     const consejo = await this.getConsejoContext(idConsejo);
     this.ensureModerator(consejo.id_moderador, actorMemberId);
     const state = this.getOrCreateState(idConsejo, consejo);
-    state.speakers = state.speakers.filter((item) => item.memberId !== memberId);
+    state.speakers = state.speakers.filter(
+      (item) => item.memberId !== memberId,
+    );
     return this.buildStateFromContext(consejo, state);
   }
 
@@ -194,7 +200,9 @@ export class ConsejoRealtimeService {
     });
 
     if (!temario) {
-      throw new NotFoundException('El tema indicado no existe en este consejo.');
+      throw new NotFoundException(
+        'El tema indicado no existe en este consejo.',
+      );
     }
 
     const adultMember = await this.prisma.miembro.findFirst({
@@ -320,7 +328,11 @@ export class ConsejoRealtimeService {
     moderatorMemberId: number | null,
     actorMemberId: number | null,
   ) {
-    if (!moderatorMemberId || !actorMemberId || moderatorMemberId !== actorMemberId) {
+    if (
+      !moderatorMemberId ||
+      !actorMemberId ||
+      moderatorMemberId !== actorMemberId
+    ) {
       throw new ForbiddenException(
         'Solo el moderador del consejo puede gestionar oradores.',
       );

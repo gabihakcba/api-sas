@@ -244,7 +244,10 @@ export class ResponsablesService {
     user: AuthenticatedUser,
   ) {
     const responsable = await this.ensureResponsableAccessible(id, user);
-    const allowedIds = await this.getAccessibleProtagonistaIds(user, dto.protagonistaIds);
+    const allowedIds = await this.getAccessibleProtagonistaIds(
+      user,
+      dto.protagonistaIds,
+    );
     const relacionId = await this.getDefaultRelacionId();
 
     await this.prisma.$transaction(async (tx) => {
@@ -361,7 +364,10 @@ export class ResponsablesService {
     });
   }
 
-  private async ensureResponsableAccessible(id: number, user: AuthenticatedUser) {
+  private async ensureResponsableAccessible(
+    id: number,
+    user: AuthenticatedUser,
+  ) {
     const responsable = await this.prisma.responsable.findFirst({
       where: this.scopeFilterService.mergeWhere(
         {
@@ -545,7 +551,10 @@ export class ResponsablesService {
     let scopeId: number | null = null;
 
     if (responsableId) {
-      const ramaIds = await this.getResponsableCurrentRamaIds(tx, responsableId);
+      const ramaIds = await this.getResponsableCurrentRamaIds(
+        tx,
+        responsableId,
+      );
 
       if (ramaIds.length === 1) {
         scopeType = SCOPE.RAMA;

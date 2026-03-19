@@ -142,7 +142,9 @@ export class RelacionesService {
 
     const tipo = dto.tipo?.trim();
     const descripcion =
-      dto.descripcion !== undefined ? dto.descripcion.trim() || null : undefined;
+      dto.descripcion !== undefined
+        ? dto.descripcion.trim() || null
+        : undefined;
 
     if (tipo) {
       const existing = await this.prisma.relacion.findFirst({

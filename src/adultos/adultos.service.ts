@@ -99,7 +99,9 @@ export class AdultosService {
               }
             : {}),
         },
-        ...((paginationQuery.idArea || paginationQuery.idPosicion || paginationQuery.idRama)
+        ...(paginationQuery.idArea ||
+        paginationQuery.idPosicion ||
+        paginationQuery.idRama
           ? {
               EquipoArea: {
                 some: {
@@ -439,9 +441,7 @@ export class AdultosService {
     });
 
     if (!adulto) {
-      throw new BadRequestException(
-        'Solo puedes modificar tu propia firma.',
-      );
+      throw new BadRequestException('Solo puedes modificar tu propia firma.');
     }
 
     const firma = this.parseFirmaBase64(dto.firmaBase64 ?? null);
@@ -729,11 +729,13 @@ export class AdultosService {
       },
     });
 
-    return [...new Set(
-      relaciones.flatMap((relacion) =>
-        relacion.Protagonista.Miembro.MiembroRama.map((rama) => rama.id_rama),
+    return [
+      ...new Set(
+        relaciones.flatMap((relacion) =>
+          relacion.Protagonista.Miembro.MiembroRama.map((rama) => rama.id_rama),
+        ),
       ),
-    )];
+    ];
   }
 
   async update(id: number, dto: UpdateAdultoDto, user: AuthenticatedUser) {

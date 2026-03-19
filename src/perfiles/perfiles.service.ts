@@ -40,14 +40,16 @@ export class PerfilesService {
     });
 
     if (!miembro || !miembro.id_cuenta) {
-      throw new NotFoundException('No se encontró un perfil asociado a la cuenta.');
+      throw new NotFoundException(
+        'No se encontró un perfil asociado a la cuenta.',
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {
       await this.cuentasService.updateCuentaConMiembro(
         tx,
         {
-          cuentaId: miembro.id_cuenta!,
+          cuentaId: miembro.id_cuenta,
           miembroId: miembro.id,
         },
         {
@@ -516,7 +518,9 @@ export class PerfilesService {
     });
 
     if (!miembro) {
-      throw new NotFoundException('No se encontró un perfil asociado a la cuenta.');
+      throw new NotFoundException(
+        'No se encontró un perfil asociado a la cuenta.',
+      );
     }
 
     return miembro.id;
@@ -543,7 +547,9 @@ export class PerfilesService {
     });
 
     if (!miembro) {
-      throw new NotFoundException('El perfil indicado no existe o no está disponible.');
+      throw new NotFoundException(
+        'El perfil indicado no existe o no está disponible.',
+      );
     }
 
     return miembro;
@@ -739,14 +745,15 @@ export class PerfilesService {
 
     const prefix = 'base64,';
     const index = firmaBase64.indexOf(prefix);
-    const rawBase64 = index >= 0
-      ? firmaBase64.slice(index + prefix.length)
-      : firmaBase64;
+    const rawBase64 =
+      index >= 0 ? firmaBase64.slice(index + prefix.length) : firmaBase64;
 
     try {
       return Buffer.from(rawBase64, 'base64');
     } catch {
-      throw new BadRequestException('La firma enviada no tiene un formato válido.');
+      throw new BadRequestException(
+        'La firma enviada no tiene un formato válido.',
+      );
     }
   }
 }

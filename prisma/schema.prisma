@@ -75,6 +75,7 @@ model Miembro {
   ConsejoModerado       Consejo[]               @relation(name: "ConsejoModerador")
   ConsejoSecretariado   Consejo[]               @relation(name: "ConsejoSecretario")
   ConsejoProsecretaria  Consejo[]               @relation(name: "ConsejoProsecretario")
+  InvitadoReunion       InvitadoReunion[]       @relation(name: "MiembroInvitadoReunion")
 }
 
 model Protagonista {
@@ -190,6 +191,7 @@ model Area {
   CuentaDinero          CuentaDinero[]          @relation(name: "CuentaArea")
   PlanFormacionTemplate PlanFormacionTemplate[] @relation(name: "PlanFormacionTemplateArea")
   Rama                  Rama[]                  @relation(name: "RamaArea")
+  ReunionesAfectadas    AreaAfectadaReunion[]   @relation(name: "AreaAfectadaReunionArea")
 }
 
 model EquipoArea {
@@ -234,11 +236,12 @@ model Rama {
   Area Area @relation(fields: [id_area], references: [id], name: "RamaArea")
 
   // Relations
-  MiembroRama  MiembroRama[]  @relation(name: "MiembroRamaRama")
-  EquipoArea   EquipoArea[]   @relation(name: "EquipoAreaRama")
-  CuentaDinero CuentaDinero[] @relation(name: "CuentaRama")
-  RamaAfectada RamaAfectada[] @relation(name: "RamaAfectadaRama")
-  CicloPrograma CicloPrograma[] @relation(name: "CicloProgramaRama")
+  MiembroRama        MiembroRama[]         @relation(name: "MiembroRamaRama")
+  EquipoArea         EquipoArea[]          @relation(name: "EquipoAreaRama")
+  CuentaDinero       CuentaDinero[]        @relation(name: "CuentaRama")
+  RamaAfectada       RamaAfectada[]        @relation(name: "RamaAfectadaRama")
+  ReunionesAfectadas RamaAfectadaReunion[] @relation(name: "RamaAfectadaReunionRama")
+  CicloPrograma      CicloPrograma[]       @relation(name: "CicloProgramaRama")
 }
 
 model PosicionArea {
@@ -433,6 +436,86 @@ model InscripcionEvento {
   // Foreign key relations
   Evento  Evento  @relation(fields: [id_evento], references: [id], name: "InscripcionEventoEvento")
   Miembro Miembro @relation(fields: [id_miembro], references: [id], name: "InscripcionEventoMiembro")
+}
+
+enum MODALIDAD_REUNION {
+  PRESENCIAL
+  VIRTUAL
+  HIBRIDA
+}
+
+model Reunion {
+  id           Int               @id @default(autoincrement())
+  titulo       String
+  descripcion  String?           @db.Text
+  fecha_inicio DateTime
+  fecha_fin    DateTime
+  modalidad    MODALIDAD_REUNION @default(PRESENCIAL)
+
+  lugar_fisico String?
+  url_virtual  String?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Invitados      InvitadoReunion[]     @relation(name: "ReunionInvitado")
+  AreasAfectadas AreaAfectadaReunion[] @relation(name: "AreaAfectadaReunionReunion")
+  RamasAfectadas RamaAfectadaReunion[] @relation(name: "RamaAfectadaReunionReunion")
+}
+
+model InvitadoReunion {
+  id       Int      @id @default(autoincrement())
+  asistio  Boolean  @default(false)
+  confirmo Boolean?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  id_reunion Int
+  id_miembro Int
+
+  Reunion Reunion @relation(fields: [id_reunion], references: [id], name: "ReunionInvitado")
+  Miembro Miembro @relation(fields: [id_miembro], references: [id], name: "MiembroInvitadoReunion")
+
+  @@unique([id_reunion, id_miembro])
+  @@index([id_miembro])
+  @@index([id_reunion, borrado])
+}
+
+model AreaAfectadaReunion {
+  id Int @id @default(autoincrement())
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  id_reunion Int
+  id_area    Int
+
+  Reunion Reunion @relation(fields: [id_reunion], references: [id], name: "AreaAfectadaReunionReunion")
+  Area    Area    @relation(fields: [id_area], references: [id], name: "AreaAfectadaReunionArea")
+
+  @@unique([id_reunion, id_area])
+  @@index([id_area])
+}
+
+model RamaAfectadaReunion {
+  id Int @id @default(autoincrement())
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  id_reunion Int
+  id_rama    Int
+
+  Reunion Reunion @relation(fields: [id_reunion], references: [id], name: "RamaAfectadaReunionReunion")
+  Rama    Rama    @relation(fields: [id_rama], references: [id], name: "RamaAfectadaReunionRama")
+
+  @@unique([id_reunion, id_rama])
+  @@index([id_rama])
 }
 
 //
@@ -895,11 +978,11 @@ model Log {
 }
 
 model Action {
-  id             Int      @id @default(autoincrement())
-  tabla          String
-  pre_registro   Json
-  post_registro  Json?
-  createdAt      DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  tabla         String
+  pre_registro  Json
+  post_registro Json?
+  createdAt     DateTime @default(now())
 
   // Foreign key
   id_log Int
@@ -976,6 +1059,8 @@ enum RESOURCE {
   ADJUNTO_FORMACION
   CICLO_PROGRAMA
   CONFIGURACION_GRUPO
+  REUNION
+  INVITADO_REUNION
 }
 
 model Permission {

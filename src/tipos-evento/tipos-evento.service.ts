@@ -66,7 +66,9 @@ export class TiposEventoService {
     });
 
     if (existing) {
-      throw new ConflictException('Ya existe un tipo de evento con ese nombre.');
+      throw new ConflictException(
+        'Ya existe un tipo de evento con ese nombre.',
+      );
     }
 
     const created = await this.prisma.tipoEvento.create({
@@ -85,7 +87,9 @@ export class TiposEventoService {
 
     const nombre = dto.nombre?.trim();
     const descripcion =
-      dto.descripcion !== undefined ? dto.descripcion.trim() || null : undefined;
+      dto.descripcion !== undefined
+        ? dto.descripcion.trim() || null
+        : undefined;
 
     if (nombre) {
       const existing = await this.prisma.tipoEvento.findFirst({
@@ -98,7 +102,9 @@ export class TiposEventoService {
       });
 
       if (existing) {
-        throw new ConflictException('Ya existe un tipo de evento con ese nombre.');
+        throw new ConflictException(
+          'Ya existe un tipo de evento con ese nombre.',
+        );
       }
     }
 

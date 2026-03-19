@@ -10,7 +10,9 @@ export class CalendarEventosQueryDto {
 
   @IsOptional()
   @Transform(({ value }) =>
-    value === undefined || value === null || value === '' ? undefined : Number(value),
+    value === undefined || value === null || value === ''
+      ? undefined
+      : Number(value),
   )
   @IsInt()
   @Min(1)
@@ -18,7 +20,9 @@ export class CalendarEventosQueryDto {
 
   @IsOptional()
   @Transform(({ value }) =>
-    value === undefined || value === null || value === '' ? undefined : Number(value),
+    value === undefined || value === null || value === ''
+      ? undefined
+      : Number(value),
   )
   @IsInt()
   @Min(1)
@@ -26,7 +30,9 @@ export class CalendarEventosQueryDto {
 
   @IsOptional()
   @Transform(({ value }) =>
-    value === undefined || value === null || value === '' ? undefined : Number(value),
+    value === undefined || value === null || value === ''
+      ? undefined
+      : Number(value),
   )
   @IsInt()
   @Min(1)

@@ -43,7 +43,8 @@ export class RequestAuditInterceptor implements NestInterceptor {
             memberId: user.memberId,
           }
         : null,
-      endpoint: `${request.method} ${request.originalUrl ?? request.url ?? ''}`.trim(),
+      endpoint:
+        `${request.method} ${request.originalUrl ?? request.url ?? ''}`.trim(),
       ip: request.ip ?? null,
       userAgent:
         typeof request.headers?.['user-agent'] === 'string'

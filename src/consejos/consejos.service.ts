@@ -188,9 +188,7 @@ export class ConsejosService {
       .replace(/(^-|-$)/g, '');
 
     return {
-      filename: `${slug || 'consejo'}${
-        allowPrivateTopics ? '' : '-pdf'
-      }.pdf`,
+      filename: `${slug || 'consejo'}${allowPrivateTopics ? '' : '-pdf'}.pdf`,
       buffer,
     };
   }
@@ -487,7 +485,11 @@ export class ConsejosService {
     await this.ensureExists(idConsejo);
     await this.ensureTemarioExists(idConsejo, temarioId);
     await this.ensureAdultMember(user.memberId);
-    await this.ensureTemarioRestrictedFieldsAccess(idConsejo, user.memberId, dto);
+    await this.ensureTemarioRestrictedFieldsAccess(
+      idConsejo,
+      user.memberId,
+      dto,
+    );
     const data = this.normalizeTemarioUpdatePayload(dto);
 
     return this.prisma.temarioConsejo.update({
@@ -846,12 +848,8 @@ export class ConsejosService {
   private normalizeTemarioCreatePayload(dto: CreateTemarioConsejoDto) {
     const titulo = dto.titulo.trim().replace(/\s+/g, ' ');
     const descripcion = dto.descripcion?.trim() || null;
-    const debate = dto.debate
-      ? this.sanitizeRichTextHtml(dto.debate)
-      : null;
-    const acuerdo = dto.acuerdo
-      ? this.sanitizeRichTextHtml(dto.acuerdo)
-      : null;
+    const debate = dto.debate ? this.sanitizeRichTextHtml(dto.debate) : null;
+    const acuerdo = dto.acuerdo ? this.sanitizeRichTextHtml(dto.acuerdo) : null;
 
     if (titulo.length < 3) {
       throw new BadRequestException(

@@ -62,7 +62,7 @@ export class ComisionesController {
     @Request() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.comisionesService.findOne(id, req.user!);
+    return this.comisionesService.findOne(id, req.user);
   }
 
   @Post()
@@ -92,7 +92,7 @@ export class ComisionesController {
     @Request() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.comisionesService.getParticipantes(id, req.user!);
+    return this.comisionesService.getParticipantes(id, req.user);
   }
 
   @Patch(':id/participantes')

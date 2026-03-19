@@ -40,6 +40,8 @@ const SECRETARIA_TESORERIA_RESOURCES = [
   RESOURCE.EVENTO,
   RESOURCE.INSCRIPCION,
   RESOURCE.TIPO_EVENTO,
+  RESOURCE.REUNION,
+  RESOURCE.INVITADO_REUNION,
 ] as const;
 
 const ADULTO_READONLY_RESOURCES = [RESOURCE.ADULTO] as const;
@@ -62,6 +64,8 @@ const RAMA_FULL_ACCESS_RESOURCES = [
   RESOURCE.CUENTA_DINERO,
   RESOURCE.PAGO,
   RESOURCE.CICLO_PROGRAMA,
+  RESOURCE.REUNION,
+  RESOURCE.INVITADO_REUNION,
 ] as const;
 
 const RAMA_READONLY_RESOURCES = [
@@ -953,6 +957,7 @@ const PROTAGONISTA_READONLY_RESOURCES = [
   RESOURCE.CUENTA_DINERO,
   RESOURCE.COMISION,
   RESOURCE.PARTICIPANTE_COMISION,
+  RESOURCE.REUNION,
   RESOURCE.PLAN_FORMACION,
   RESOURCE.PLAN_DESEMPENO,
 ] as const;
@@ -1023,6 +1028,11 @@ const ADULT_PLAN_DESEMPENO_PERMISSIONS: RoleDefinition['permissions'][number] = 
   resources: [RESOURCE.PLAN_DESEMPENO],
 };
 
+const ADULT_REUNION_PERMISSIONS: RoleDefinition['permissions'][number] = {
+  actions: CRUD_ACTIONS,
+  resources: [RESOURCE.REUNION, RESOURCE.INVITADO_REUNION],
+};
+
 const RESPONSABLE_READ_PERMISSIONS: RoleDefinition['permissions'][number] = {
   actions: [ACTION.READ],
   resources: ALL_RESOURCES.filter(
@@ -1090,6 +1100,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
       ADULT_TIPO_EVENTO_PERMISSIONS,
       ADULT_PLAN_FORMACION_PERMISSIONS,
       ADULT_PLAN_DESEMPENO_PERMISSIONS,
+      ADULT_REUNION_PERMISSIONS,
     ],
   },
   {
@@ -1110,6 +1121,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
       ADULT_TIPO_EVENTO_PERMISSIONS,
       ADULT_PLAN_FORMACION_PERMISSIONS,
       ADULT_PLAN_DESEMPENO_PERMISSIONS,
+      ADULT_REUNION_PERMISSIONS,
     ],
   },
   {
@@ -1134,6 +1146,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
       ADULT_TIPO_EVENTO_PERMISSIONS,
       ADULT_PLAN_FORMACION_PERMISSIONS,
       ADULT_PLAN_DESEMPENO_PERMISSIONS,
+      ADULT_REUNION_PERMISSIONS,
     ],
   },
   {
@@ -1150,6 +1163,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
       ADULT_TIPO_EVENTO_PERMISSIONS,
       ADULT_PLAN_FORMACION_PERMISSIONS,
       ADULT_PLAN_DESEMPENO_PERMISSIONS,
+      ADULT_REUNION_PERMISSIONS,
     ],
   },
   {
@@ -1166,6 +1180,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
       ADULT_TIPO_EVENTO_PERMISSIONS,
       ADULT_PLAN_FORMACION_PERMISSIONS,
       ADULT_PLAN_DESEMPENO_PERMISSIONS,
+      ADULT_REUNION_PERMISSIONS,
     ],
   },
   {
@@ -1187,11 +1202,13 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
       ADULT_CONSEJO_PERMISSIONS,
       ADULT_PLAN_FORMACION_PERMISSIONS,
       ADULT_PLAN_DESEMPENO_PERMISSIONS,
+      ADULT_REUNION_PERMISSIONS,
     ],
   },
 ];
 
 const ADMIN_DNI = '00000000';
+const DEV_DNI = '11111111';
 const DEFAULT_GROUP_NAME =
   process.env.GRUPO_NOMBRE?.trim() || 'Grupo Scout Adalberto O. Lopez 494';
 
@@ -2036,6 +2053,107 @@ async function seedAdminAccount(
   }
 }
 
+async function seedDevAccount(
+  tx: Prisma.TransactionClient,
+  roleIdByName: Map<string, number>,
+): Promise<void> {
+  console.log('Creando usuario dev...');
+
+  const devUser = getRequiredEnv('DEV_ADMIN_USER');
+  const devEmail = getRequiredEnv('DEV_ADMIN_EMAIL');
+  const devPassword = getRequiredEnv('DEV_ADMIN_PASSWORD');
+
+  const devRoleId = roleIdByName.get('DEV');
+
+  if (!devRoleId) {
+    throw new Error('El rol DEV es obligatorio para crear el usuario dev.');
+  }
+
+  const hashedPassword = await bcrypt.hash(devPassword, 10);
+
+  const cuentaByUser = await tx.cuenta.findUnique({
+    where: { user: devUser },
+  });
+
+  const miembro = await tx.miembro.findUnique({
+    where: { dni: DEV_DNI },
+  });
+
+  if (miembro && cuentaByUser && miembro.id_cuenta !== cuentaByUser.id) {
+    throw new Error(
+      `El usuario dev ${devUser} ya existe en otra cuenta distinta a la vinculada al DNI ${DEV_DNI}. Regulariza ese conflicto antes de reintentar el seed.`,
+    );
+  }
+
+  let cuenta = cuentaByUser;
+
+  if (!cuenta && miembro) {
+    cuenta = await tx.cuenta.findUnique({
+      where: { id: miembro.id_cuenta },
+    });
+  }
+
+  if (!cuenta) {
+    cuenta = await tx.cuenta.create({
+      data: {
+        user: devUser,
+        password: hashedPassword,
+      },
+    });
+  } else {
+    cuenta = await tx.cuenta.update({
+      where: { id: cuenta.id },
+      data: {
+        user: devUser,
+        password: hashedPassword,
+        borrado: false,
+      },
+    });
+  }
+
+  if (!miembro) {
+    await tx.miembro.create({
+      data: {
+        nombre: 'Super',
+        apellidos: 'Dev',
+        dni: DEV_DNI,
+        fecha_nacimiento: new Date('1990-01-01'),
+        direccion: 'Calle Dev 123',
+        email: devEmail,
+        telefono_emergencia: '911',
+        id_cuenta: cuenta.id,
+      },
+    });
+  } else {
+    await tx.miembro.update({
+      where: { id: miembro.id },
+      data: {
+        email: devEmail,
+        borrado: false,
+      },
+    });
+  }
+
+  const devRoleAssignment = await tx.cuentaRole.findFirst({
+    where: {
+      id_cuenta: cuenta.id,
+      id_role: devRoleId,
+      tipo_scope: SCOPE.GRUPO,
+      id_scope: null,
+    },
+  });
+
+  if (!devRoleAssignment) {
+    await tx.cuentaRole.create({
+      data: {
+        id_cuenta: cuenta.id,
+        id_role: devRoleId,
+        tipo_scope: SCOPE.GRUPO,
+      },
+    });
+  }
+}
+
 async function main() {
   console.log('Iniciando seed...');
 
@@ -2052,16 +2170,17 @@ async function main() {
     await tx.configuracionGrupo.upsert({
       where: { id: 1 },
       update: {},
-    create: {
-      id: 1,
-      nombre_grupo: DEFAULT_GROUP_NAME,
-      url_logo: '/logo.png',
-      url_favicon: '/favicon.ico',
-      theme_web: 'lara-light-blue',
-      theme_mobile: 'md3-light',
-    },
-  });
+      create: {
+        id: 1,
+        nombre_grupo: DEFAULT_GROUP_NAME,
+        url_logo: '/logo.png',
+        url_favicon: '/favicon.ico',
+        theme_web: 'lara-light-blue',
+        theme_mobile: 'md3-light',
+      },
+    });
     await seedAdminAccount(tx, roleIdByName);
+    await seedDevAccount(tx, roleIdByName);
   });
 
   console.log('Seed completado con exito.');

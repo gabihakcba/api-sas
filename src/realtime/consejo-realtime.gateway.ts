@@ -49,7 +49,7 @@ export class ConsejoRealtimeGateway
 
       const payload = this.jwtService.verify(token, {
         secret: process.env.JWT_SECRET || 'secretKey',
-      }) as RealtimeSocketUser & { sub: number; username: string };
+      });
 
       client.data.user = {
         userId: payload.sub,

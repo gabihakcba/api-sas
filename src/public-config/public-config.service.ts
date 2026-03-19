@@ -72,10 +72,10 @@ export class PublicConfigService {
 
     const nextLogoPath = files.logo
       ? await this.storeBrandingFile('logo', files.logo)
-      : current?.url_logo ?? null;
+      : (current?.url_logo ?? null);
     const nextFaviconPath = files.favicon
       ? await this.storeBrandingFile('favicon', files.favicon)
-      : current?.url_favicon ?? null;
+      : (current?.url_favicon ?? null);
 
     const updated = await this.prisma.configuracionGrupo.upsert({
       where: { id: 1 },
@@ -104,7 +104,11 @@ export class PublicConfigService {
       },
     });
 
-    if (files.logo && current?.url_logo && current.url_logo !== updated.url_logo) {
+    if (
+      files.logo &&
+      current?.url_logo &&
+      current.url_logo !== updated.url_logo
+    ) {
       await this.removeStoredFile(current.url_logo);
     }
 
@@ -122,7 +126,9 @@ export class PublicConfigService {
   private ensureManagementAccess(user: AuthenticatedUser) {
     const hasAccess = user.scopes.some(
       (scope) =>
-        (scope.role === 'ADM' || scope.role === 'DEV' || scope.role === 'JEFATURA') &&
+        (scope.role === 'ADM' ||
+          scope.role === 'DEV' ||
+          scope.role === 'JEFATURA') &&
         (scope.scopeType === SCOPE.GRUPO || scope.scopeType === SCOPE.GLOBAL),
     );
 
@@ -138,7 +144,9 @@ export class PublicConfigService {
   }
 
   private getFileExtension(file: UploadedBrandingFile) {
-    const originalExtension = path.extname(file.originalname || '').toLowerCase();
+    const originalExtension = path
+      .extname(file.originalname || '')
+      .toLowerCase();
 
     if (originalExtension) {
       return originalExtension;

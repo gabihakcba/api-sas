@@ -4,7 +4,9 @@ import { IsInt, IsOptional, Min } from 'class-validator';
 export class UpdateConsejoModeradorDto {
   @IsOptional()
   @Transform(({ value }) =>
-    value === undefined || value === null || value === '' ? null : Number(value),
+    value === undefined || value === null || value === ''
+      ? null
+      : Number(value),
   )
   @IsInt()
   @Min(1)

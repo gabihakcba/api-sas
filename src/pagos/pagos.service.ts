@@ -87,92 +87,92 @@ export class PagosService {
     const where = this.scopeFilterService.mergeWhere(
       this.buildVisiblePagoWhere(
         {
-        ...(paginationQuery.idConceptoPago
-          ? { id_concepto_pago: paginationQuery.idConceptoPago }
-          : {}),
-        ...(paginationQuery.idMetodoPago
-          ? { id_metodo_pago: paginationQuery.idMetodoPago }
-          : {}),
-        ...(paginationQuery.idCuentaDinero
-          ? { id_cuenta_dinero: paginationQuery.idCuentaDinero }
-          : {}),
-        ...(paginationQuery.idCuentaOrigen
-          ? { id_cuenta_origen: paginationQuery.idCuentaOrigen }
-          : {}),
-        ...(searchTerm
-          ? {
-              OR: [
-                {
-                  codigo_validacion: {
-                    contains: searchTerm,
-                    mode: Prisma.QueryMode.insensitive,
+          ...(paginationQuery.idConceptoPago
+            ? { id_concepto_pago: paginationQuery.idConceptoPago }
+            : {}),
+          ...(paginationQuery.idMetodoPago
+            ? { id_metodo_pago: paginationQuery.idMetodoPago }
+            : {}),
+          ...(paginationQuery.idCuentaDinero
+            ? { id_cuenta_dinero: paginationQuery.idCuentaDinero }
+            : {}),
+          ...(paginationQuery.idCuentaOrigen
+            ? { id_cuenta_origen: paginationQuery.idCuentaOrigen }
+            : {}),
+          ...(searchTerm
+            ? {
+                OR: [
+                  {
+                    codigo_validacion: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
                   },
-                },
-                {
-                  detalles: {
-                    contains: searchTerm,
-                    mode: Prisma.QueryMode.insensitive,
+                  {
+                    detalles: {
+                      contains: searchTerm,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
                   },
-                },
-                {
-                  Miembro: {
-                    OR: [
-                      {
-                        nombre: {
-                          contains: searchTerm,
-                          mode: Prisma.QueryMode.insensitive,
+                  {
+                    Miembro: {
+                      OR: [
+                        {
+                          nombre: {
+                            contains: searchTerm,
+                            mode: Prisma.QueryMode.insensitive,
+                          },
                         },
-                      },
-                      {
-                        apellidos: {
-                          contains: searchTerm,
-                          mode: Prisma.QueryMode.insensitive,
+                        {
+                          apellidos: {
+                            contains: searchTerm,
+                            mode: Prisma.QueryMode.insensitive,
+                          },
                         },
-                      },
-                      {
-                        dni: {
-                          contains: searchTerm,
-                          mode: Prisma.QueryMode.insensitive,
+                        {
+                          dni: {
+                            contains: searchTerm,
+                            mode: Prisma.QueryMode.insensitive,
+                          },
                         },
+                      ],
+                    },
+                  },
+                  {
+                    ConceptoPago: {
+                      nombre: {
+                        contains: searchTerm,
+                        mode: Prisma.QueryMode.insensitive,
                       },
-                    ],
-                  },
-                },
-                {
-                  ConceptoPago: {
-                    nombre: {
-                      contains: searchTerm,
-                      mode: Prisma.QueryMode.insensitive,
                     },
                   },
-                },
-                {
-                  MetodoPago: {
-                    nombre: {
-                      contains: searchTerm,
-                      mode: Prisma.QueryMode.insensitive,
+                  {
+                    MetodoPago: {
+                      nombre: {
+                        contains: searchTerm,
+                        mode: Prisma.QueryMode.insensitive,
+                      },
                     },
                   },
-                },
-                {
-                  CuentaDinero: {
-                    nombre: {
-                      contains: searchTerm,
-                      mode: Prisma.QueryMode.insensitive,
+                  {
+                    CuentaDinero: {
+                      nombre: {
+                        contains: searchTerm,
+                        mode: Prisma.QueryMode.insensitive,
+                      },
                     },
                   },
-                },
-                {
-                  CuentaOrigen: {
-                    nombre: {
-                      contains: searchTerm,
-                      mode: Prisma.QueryMode.insensitive,
+                  {
+                    CuentaOrigen: {
+                      nombre: {
+                        contains: searchTerm,
+                        mode: Prisma.QueryMode.insensitive,
+                      },
                     },
                   },
-                },
-              ],
-            }
-          : {}),
+                ],
+              }
+            : {}),
         },
         includeDeleted,
       ),
@@ -302,11 +302,7 @@ export class PagosService {
     };
   }
 
-  async create(
-    dto: CreatePagoDto,
-    user: AuthenticatedUser,
-    logId?: number,
-  ) {
+  async create(dto: CreatePagoDto, user: AuthenticatedUser, logId?: number) {
     return this.prisma.$transaction(async (tx) => {
       const data = await this.resolvePagoData(tx, dto, user);
 
@@ -563,7 +559,8 @@ export class PagosService {
 
     return {
       phone,
-      responsableNombre: `${firstResponsable.nombre} ${firstResponsable.apellidos}`.trim(),
+      responsableNombre:
+        `${firstResponsable.nombre} ${firstResponsable.apellidos}`.trim(),
       message: [
         `Hola ${firstResponsable.nombre},`,
         `te compartimos el comprobante del pago ${pago.codigo_validacion}.`,
@@ -1307,7 +1304,11 @@ export class PagosService {
     const defaultLogoPath = path.resolve(process.cwd(), 'public/logo.png');
     const configuredLogoPath =
       config?.url_logo && config.url_logo.startsWith('/')
-        ? path.resolve(process.cwd(), 'public', config.url_logo.replace(/^\/+/, ''))
+        ? path.resolve(
+            process.cwd(),
+            'public',
+            config.url_logo.replace(/^\/+/, ''),
+          )
         : null;
 
     return {

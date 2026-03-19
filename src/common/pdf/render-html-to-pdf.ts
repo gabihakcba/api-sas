@@ -46,4 +46,3 @@ export const sanitizeHtmlForPdf = (html: string): string =>
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
     .replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, '')
     .replace(/javascript:/gi, '');
-

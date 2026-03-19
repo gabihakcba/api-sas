@@ -31,7 +31,7 @@ const ADULT_MEMBER_ROLES = new Set([
 
 const ADULT_READ_ONLY_ROLES = new Set(['SECRETARIA_TESORERIA', 'INTENDENCIA']);
 
-const ADMIN_BYPASS_ROLES = new Set(['ADM', 'OWN']);
+const ADMIN_BYPASS_ROLES = new Set(['ADM', 'OWN', 'DEV']);
 @Injectable()
 export class AuthService {
   constructor(
@@ -129,7 +129,7 @@ export class AuthService {
       scopeId: cr.id_scope ?? null,
     }));
 
-  const permissionsSet = new Set<string>();
+    const permissionsSet = new Set<string>();
     account.CuentaRole.forEach((cr) => {
       cr.Role.RolePermission.forEach((rp) => {
         permissionsSet.add(`${rp.Permission.action}:${rp.Permission.resource}`);
@@ -225,6 +225,7 @@ export class AuthService {
       permissionsSet.add(`${ACTION.READ}:${RESOURCE.PAGO}`);
       permissionsSet.add(`${ACTION.READ}:${RESOURCE.CONSEJO}`);
       permissionsSet.add(`${ACTION.READ}:${RESOURCE.EVENTO}`);
+      permissionsSet.add(`${ACTION.READ}:${RESOURCE.REUNION}`);
     }
   }
 

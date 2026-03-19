@@ -5,10 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import {
-  AcceptedRole,
-  ROLES_KEY,
-} from '../decorators/roles.decorator';
+import { AcceptedRole, ROLES_KEY } from '../decorators/roles.decorator';
 import { AuthenticatedRequest } from '../types/auth-request.types';
 import { hasUnrestrictedAccess } from '../utils/unrestricted-access.util';
 

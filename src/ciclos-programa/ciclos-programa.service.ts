@@ -220,7 +220,11 @@ export class CiclosProgramaService {
     return this.findOne(ciclo.id, user);
   }
 
-  async update(user: AuthenticatedUser, id: number, dto: UpdateCicloProgramaDto) {
+  async update(
+    user: AuthenticatedUser,
+    id: number,
+    dto: UpdateCicloProgramaDto,
+  ) {
     this.ensureModuleAccess(user);
 
     const current = await this.ensureExists(id, user);
@@ -246,7 +250,9 @@ export class CiclosProgramaService {
         ...(dto.descripcion !== undefined
           ? { descripcion: dto.descripcion.trim() || null }
           : {}),
-        ...(dto.fechaInicio !== undefined ? { fecha_inicio: dto.fechaInicio } : {}),
+        ...(dto.fechaInicio !== undefined
+          ? { fecha_inicio: dto.fechaInicio }
+          : {}),
         ...(dto.fechaFin !== undefined ? { fecha_fin: dto.fechaFin } : {}),
         ...(dto.estado !== undefined ? { estado: dto.estado } : {}),
         ...(dto.diagnostico !== undefined
@@ -478,11 +484,13 @@ export class CiclosProgramaService {
 
     const eventosHtml =
       ciclo.Evento.length > 0
-        ? `<ul>${ciclo.Evento.map((evento) => `<li>
+        ? `<ul>${ciclo.Evento.map(
+            (evento) => `<li>
           <strong>${escapeHtml(evento.nombre)}</strong><br/>
           <span>${escapeHtml(this.formatDate(evento.fecha_inicio))} – ${escapeHtml(this.formatDate(evento.fecha_fin))}</span><br/>
           <span>Tipo: ${escapeHtml(evento.TipoEvento?.nombre ?? 'Sin tipo')} · Estado: ${evento.terminado ? 'Completado' : 'Pendiente'}</span>
-        </li>`).join('')}</ul>`
+        </li>`,
+          ).join('')}</ul>`
         : '<p>No hay eventos asociados.</p>';
 
     return `
@@ -535,7 +543,9 @@ export class CiclosProgramaService {
   }
 
   private formatDate(date: Date) {
-    return new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' }).format(date);
+    return new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' }).format(
+      date,
+    );
   }
 
   private extractScopedRamaIds(user: AuthenticatedUser) {

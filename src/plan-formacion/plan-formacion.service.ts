@@ -4,11 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  Prisma,
-  SCOPE,
-  TIPO_COMPETENCIA_FORMACION,
-} from '@prisma/client';
+import { Prisma, SCOPE, TIPO_COMPETENCIA_FORMACION } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import { hasScopedRoleAccess } from '../auth/utils/unrestricted-access.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -195,38 +191,98 @@ const DEFAULT_TEMPLATE_COMPETENCIAS: Record<
   }>
 > = {
   1: [
-    { nombre: 'Orientación al cambio', tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL },
+    {
+      nombre: 'Orientación al cambio',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL,
+    },
     { nombre: 'Trabajo en equipo', tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL },
     { nombre: 'Cultura asociativa', tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL },
-    { nombre: 'Relaciones interpersonales', tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL },
-    { nombre: 'Cuidado integral de las personas', tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL },
+    {
+      nombre: 'Relaciones interpersonales',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL,
+    },
+    {
+      nombre: 'Cuidado integral de las personas',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL,
+    },
     { nombre: 'Método scout', tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL },
-    { nombre: 'Sistema de Equipos', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
+    {
+      nombre: 'Sistema de Equipos',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
     { nombre: 'Marco Simbólico', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
-    { nombre: 'Progresión Personal', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
-    { nombre: 'Involucramiento comunitario', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
-    { nombre: 'Oportunidades de aprendizaje', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
-    { nombre: 'Aire libre y responsabilidad ambiental', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
+    {
+      nombre: 'Progresión Personal',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
+    {
+      nombre: 'Involucramiento comunitario',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
+    {
+      nombre: 'Oportunidades de aprendizaje',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
+    {
+      nombre: 'Aire libre y responsabilidad ambiental',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
   ],
   2: [
-    { nombre: 'Cuidado integral de las personas', tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL },
+    {
+      nombre: 'Cuidado integral de las personas',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL,
+    },
     { nombre: 'Método scout', tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL },
-    { nombre: 'Sistema de Equipos', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
+    {
+      nombre: 'Sistema de Equipos',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
     { nombre: 'Marco Simbólico', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
-    { nombre: 'Progresión Personal', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
-    { nombre: 'Involucramiento comunitario', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
-    { nombre: 'Oportunidades de aprendizaje', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
-    { nombre: 'Aire libre y responsabilidad ambiental', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
+    {
+      nombre: 'Progresión Personal',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
+    {
+      nombre: 'Involucramiento comunitario',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
+    {
+      nombre: 'Oportunidades de aprendizaje',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
+    {
+      nombre: 'Aire libre y responsabilidad ambiental',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
   ],
   3: [
-    { nombre: 'Cuidado integral de las personas', tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL },
+    {
+      nombre: 'Cuidado integral de las personas',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL,
+    },
     { nombre: 'Método scout', tipo: TIPO_COMPETENCIA_FORMACION.ESENCIAL },
-    { nombre: 'Sistema de Equipos', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
+    {
+      nombre: 'Sistema de Equipos',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
     { nombre: 'Marco Simbólico', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
-    { nombre: 'Progresión Personal', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
-    { nombre: 'Involucramiento comunitario', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
-    { nombre: 'Oportunidades de aprendizaje', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
-    { nombre: 'Aire libre y responsabilidad ambiental', tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA },
+    {
+      nombre: 'Progresión Personal',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
+    {
+      nombre: 'Involucramiento comunitario',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
+    {
+      nombre: 'Oportunidades de aprendizaje',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
+    {
+      nombre: 'Aire libre y responsabilidad ambiental',
+      tipo: TIPO_COMPETENCIA_FORMACION.ESPECIFICA,
+    },
   ],
 };
 
@@ -337,116 +393,117 @@ export class PlanFormacionService {
       (hasScopedRoleAccess(user, 'JEFATURA', [SCOPE.GRUPO, SCOPE.GLOBAL]) ||
         (await this.hasActiveApfAssignment(currentAdult.id)));
 
-    const [templates, areas, apfs, adultos, consejos] = await this.prisma.$transaction([
-      this.prisma.planFormacionTemplate.findMany({
-        where: {
-          borrado: false,
-        },
-        orderBy: {
-          nombre: 'asc',
-        },
-        select: planTemplateSelect,
-      }),
-      this.prisma.area.findMany({
-        where: {
-          borrado: false,
-        },
-        orderBy: {
-          nombre: 'asc',
-        },
-        select: {
-          id: true,
-          nombre: true,
-        },
-      }),
-      this.prisma.asignacionAPF.findMany({
-        where: {
-          borrado: false,
-          fecha_fin: null,
-          Adulto: {
+    const [templates, areas, apfs, adultos, consejos] =
+      await this.prisma.$transaction([
+        this.prisma.planFormacionTemplate.findMany({
+          where: {
+            borrado: false,
+          },
+          orderBy: {
+            nombre: 'asc',
+          },
+          select: planTemplateSelect,
+        }),
+        this.prisma.area.findMany({
+          where: {
+            borrado: false,
+          },
+          orderBy: {
+            nombre: 'asc',
+          },
+          select: {
+            id: true,
+            nombre: true,
+          },
+        }),
+        this.prisma.asignacionAPF.findMany({
+          where: {
+            borrado: false,
+            fecha_fin: null,
+            Adulto: {
+              borrado: false,
+              activo: true,
+              Miembro: {
+                borrado: false,
+              },
+            },
+            Consejo: {
+              borrado: false,
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          select: {
+            id: true,
+            fecha_inicio: true,
+            observacion: true,
+            Adulto: {
+              select: {
+                id: true,
+                Miembro: {
+                  select: {
+                    id: true,
+                    nombre: true,
+                    apellidos: true,
+                  },
+                },
+              },
+            },
+            Consejo: {
+              select: {
+                id: true,
+                nombre: true,
+                fecha: true,
+              },
+            },
+          },
+        }),
+        this.prisma.adulto.findMany({
+          where: {
             borrado: false,
             activo: true,
             Miembro: {
               borrado: false,
             },
           },
-          Consejo: {
-            borrado: false,
-          },
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-        select: {
-          id: true,
-          fecha_inicio: true,
-          observacion: true,
-          Adulto: {
-            select: {
-              id: true,
+          orderBy: [
+            {
               Miembro: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  apellidos: true,
-                },
+                nombre: 'asc',
+              },
+            },
+            {
+              Miembro: {
+                apellidos: 'asc',
+              },
+            },
+          ],
+          select: {
+            id: true,
+            Miembro: {
+              select: {
+                id: true,
+                nombre: true,
+                apellidos: true,
               },
             },
           },
-          Consejo: {
-            select: {
-              id: true,
-              nombre: true,
-              fecha: true,
-            },
-          },
-        },
-      }),
-      this.prisma.adulto.findMany({
-        where: {
-          borrado: false,
-          activo: true,
-          Miembro: {
+        }),
+        this.prisma.consejo.findMany({
+          where: {
             borrado: false,
           },
-        },
-        orderBy: [
-          {
-            Miembro: {
-              nombre: 'asc',
-            },
+          orderBy: {
+            fecha: 'desc',
           },
-          {
-            Miembro: {
-              apellidos: 'asc',
-            },
+          select: {
+            id: true,
+            nombre: true,
+            fecha: true,
           },
-        ],
-        select: {
-          id: true,
-          Miembro: {
-            select: {
-              id: true,
-              nombre: true,
-              apellidos: true,
-            },
-          },
-        },
-      }),
-      this.prisma.consejo.findMany({
-        where: {
-          borrado: false,
-        },
-        orderBy: {
-          fecha: 'desc',
-        },
-        select: {
-          id: true,
-          nombre: true,
-          fecha: true,
-        },
-      }),
-    ]);
+        }),
+      ]);
 
     return {
       canEdit,
@@ -515,8 +572,7 @@ export class PlanFormacionService {
 
     const canCreatePlan = user.memberId === memberId && currentAdult !== null;
     const canAccessWorkspace =
-      canCreatePlan ||
-      planes.some((plan) => currentAdult?.id === plan.APF.id);
+      canCreatePlan || planes.some((plan) => currentAdult?.id === plan.APF.id);
     const canManagePlan =
       currentAdult !== null &&
       planes.some((plan) => currentAdult.id === plan.APF.id);
@@ -592,7 +648,9 @@ export class PlanFormacionService {
     }
 
     if (!apfAdult) {
-      throw new NotFoundException('El APF indicado no existe o no está activo.');
+      throw new NotFoundException(
+        'El APF indicado no existe o no está activo.',
+      );
     }
 
     const existingPlan = await this.prisma.planDesempenoAdulto.findFirst({
@@ -949,16 +1007,17 @@ export class PlanFormacionService {
       );
     }
 
-    const planCompetencia = await this.prisma.planDesempenoCompetencia.findFirst({
-      where: {
-        borrado: false,
-        id_plan_desempeno: planId,
-        id_competencia_template: competenciaTemplateId,
-      },
-      select: {
-        id: true,
-      },
-    });
+    const planCompetencia =
+      await this.prisma.planDesempenoCompetencia.findFirst({
+        where: {
+          borrado: false,
+          id_plan_desempeno: planId,
+          id_competencia_template: competenciaTemplateId,
+        },
+        select: {
+          id: true,
+        },
+      });
 
     if (!planCompetencia) {
       throw new NotFoundException(
@@ -996,15 +1055,16 @@ export class PlanFormacionService {
     niveles: CreateTemplateDto['niveles'],
   ) {
     for (const nivel of niveles) {
-      const existingNivel = await this.prisma.planFormacionNivelTemplate.findFirst({
-        where: {
-          id_plan_formacion_template: templateId,
-          orden: nivel.orden,
-        },
-        select: {
-          id: true,
-        },
-      });
+      const existingNivel =
+        await this.prisma.planFormacionNivelTemplate.findFirst({
+          where: {
+            id_plan_formacion_template: templateId,
+            orden: nivel.orden,
+          },
+          select: {
+            id: true,
+          },
+        });
 
       const persistedNivel = existingNivel
         ? await this.prisma.planFormacionNivelTemplate.update({
@@ -1028,7 +1088,10 @@ export class PlanFormacionService {
 
       const competenciaIds: number[] = [];
 
-      for (const [competenciaIndex, competencia] of nivel.competencias.entries()) {
+      for (const [
+        competenciaIndex,
+        competencia,
+      ] of nivel.competencias.entries()) {
         const existingCompetencia =
           await this.prisma.planFormacionCompetenciaTemplate.findFirst({
             where: {
@@ -1186,13 +1249,14 @@ export class PlanFormacionService {
     const idsResultados: number[] = [];
     for (const [index, descripcion] of resultados.entries()) {
       const orden = index + 1;
-      const existing = await this.prisma.planFormacionResultadoTemplate.findFirst({
-        where: {
-          id_competencia_template: competenciaId,
-          orden,
-        },
-        select: { id: true },
-      });
+      const existing =
+        await this.prisma.planFormacionResultadoTemplate.findFirst({
+          where: {
+            id_competencia_template: competenciaId,
+            orden,
+          },
+          select: { id: true },
+        });
 
       const persisted = existing
         ? await this.prisma.planFormacionResultadoTemplate.update({

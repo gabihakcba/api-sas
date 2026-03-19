@@ -21,7 +21,10 @@ export class CuentasDineroService {
     private readonly scopeFilterService: ScopeFilterService,
   ) {}
 
-  async findAll(user: AuthenticatedUser, paginationQuery: CuentasDineroQueryDto) {
+  async findAll(
+    user: AuthenticatedUser,
+    paginationQuery: CuentasDineroQueryDto,
+  ) {
     const page = paginationQuery.page ?? 1;
     const limit = paginationQuery.limit ?? 10;
     const skip = (page - 1) * limit;
@@ -451,9 +454,11 @@ export class CuentasDineroService {
     idRama?: number;
     idMiembro?: number;
   }): Promise<{ idArea?: number; idRama?: number; idMiembro?: number }> {
-    const assignmentCount = [input.idArea, input.idRama, input.idMiembro].filter(
-      (value) => value !== undefined && value !== null,
-    ).length;
+    const assignmentCount = [
+      input.idArea,
+      input.idRama,
+      input.idMiembro,
+    ].filter((value) => value !== undefined && value !== null).length;
 
     if (assignmentCount > 1) {
       throw new BadRequestException(
@@ -605,9 +610,11 @@ export class CuentasDineroService {
         continue;
       }
 
-      const isAdultScopedRole = ['JEFATURA_RAMA', 'AYUDANTE_RAMA', 'INTENDENCIA'].includes(
-        scope.role,
-      );
+      const isAdultScopedRole = [
+        'JEFATURA_RAMA',
+        'AYUDANTE_RAMA',
+        'INTENDENCIA',
+      ].includes(scope.role);
 
       if (!isAdultScopedRole) {
         continue;

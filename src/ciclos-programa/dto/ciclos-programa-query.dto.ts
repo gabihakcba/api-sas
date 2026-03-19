@@ -1,6 +1,13 @@
 import { Transform, Type } from 'class-transformer';
 import { ESTADO_CICLO } from '@prisma/client';
-import { IsDate, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsDate,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 export class CiclosProgramaQueryDto extends PaginationQueryDto {

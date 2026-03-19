@@ -138,9 +138,9 @@ export class CalendarioService {
         ? 'protagonista'
         : miembro.Responsable
           ? 'responsable'
-        : miembro.Adulto
-          ? 'adulto'
-          : 'otro';
+          : miembro.Adulto
+            ? 'adulto'
+            : 'otro';
 
       for (
         let year = from.getUTCFullYear();
@@ -169,6 +169,47 @@ export class CalendarioService {
     });
 
     return birthdays;
+  }
+
+  async getReuniones(
+    user: AuthenticatedUser,
+    fromValue: string,
+    toValue: string,
+  ) {
+    if (!user.memberId) {
+      return [];
+    }
+
+    const { from, to } = this.parseDateRange(fromValue, toValue);
+
+    return this.prisma.reunion.findMany({
+      where: {
+        borrado: false,
+        Invitados: {
+          some: {
+            id_miembro: user.memberId,
+            borrado: false,
+          },
+        },
+        fecha_inicio: {
+          lte: to,
+        },
+        fecha_fin: {
+          gte: from,
+        },
+      },
+      orderBy: [{ fecha_inicio: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        titulo: true,
+        descripcion: true,
+        fecha_inicio: true,
+        fecha_fin: true,
+        modalidad: true,
+        lugar_fisico: true,
+        url_virtual: true,
+      },
+    });
   }
 
   private buildBirthdayOccurrence(year: number, month: number, day: number) {
