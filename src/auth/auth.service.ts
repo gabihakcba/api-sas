@@ -67,8 +67,29 @@ export class AuthService {
       },
       select: {
         id: true,
-        user: true,
         password: true,
+      },
+    });
+
+    if (!account) {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, account.password);
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    return this.getUserPayload(account.id);
+  }
+
+  async getUserPayload(accountId: number): Promise<UserPayload> {
+    const account = await this.prisma.cuenta.findUnique({
+      where: { id: accountId },
+      select: {
+        id: true,
+        user: true,
         Miembro: {
           select: {
             id: true,
@@ -112,13 +133,7 @@ export class AuthService {
     });
 
     if (!account) {
-      throw new UnauthorizedException('Credenciales inválidas');
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, account.password);
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new UnauthorizedException('Cuenta no encontrada');
     }
 
     const roles = account.CuentaRole.map((cr) => cr.Role.nombre);
@@ -147,6 +162,11 @@ export class AuthService {
       permissions: Array.from(permissionsSet),
       scopes,
     };
+  }
+
+  async generateTokenForAccount(accountId: number) {
+    const userPayload = await this.getUserPayload(accountId);
+    return this.login(userPayload);
   }
 
   private normalizeAdultReadPermissions(

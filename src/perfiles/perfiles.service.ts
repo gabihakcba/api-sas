@@ -9,6 +9,7 @@ import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import { hasUnrestrictedAccess } from '../auth/utils/unrestricted-access.util';
 import { CuentasService } from '../cuentas/cuentas.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthService } from '../auth/auth.service';
 import { UpdatePerfilPersonalDto } from './dto/update-perfil-personal.dto';
 import { UpdatePerfilFirmaDto } from './dto/update-perfil-firma.dto';
 
@@ -18,6 +19,7 @@ export class PerfilesService {
     private readonly prisma: PrismaService,
     private readonly scopeFilterService: ScopeFilterService,
     private readonly cuentasService: CuentasService,
+    private readonly authService: AuthService,
   ) {}
 
   async findMe(user: AuthenticatedUser) {
@@ -624,9 +626,14 @@ export class PerfilesService {
         }
       }
 
+      const authData = await this.authService.generateTokenForAccount(
+        miembro.id_cuenta,
+      );
+
       return {
         success: true,
         message: 'Permisos sincronizados correctamente.',
+        ...authData,
       };
     });
   }
