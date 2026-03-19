@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   ParseIntPipe,
   Request,
   UseGuards,
@@ -63,6 +64,11 @@ export class PerfilesController {
   ) {
     const perfil = await this.perfilesService.findMe(req.user!);
     return this.perfilesService.updateFirma(perfil.id, dto, req.user!);
+  }
+
+  @Post('me/sync-permissions')
+  async syncMyPermissions(@Request() req: AuthenticatedRequest) {
+    return this.perfilesService.syncPermissions(req.user!);
   }
 
   @Get(':id')

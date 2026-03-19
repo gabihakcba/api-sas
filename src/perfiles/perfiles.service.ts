@@ -506,6 +506,203 @@ export class PerfilesService {
     };
   }
 
+  async syncPermissions(user: AuthenticatedUser) {
+    const miembroId = await this.resolveOwnMemberId(user);
+
+    const miembro = await this.prisma.miembro.findUnique({
+      where: { id: miembroId },
+      include: {
+        Adulto: {
+          include: {
+            EquipoArea: {
+              where: { borrado: false, activo: true, fecha_fin: null },
+              include: {
+                Area: true,
+                Posicion: true,
+                Rama: true,
+              },
+            },
+          },
+        },
+        Protagonista: true,
+        MiembroRama: {
+          where: { borrado: false, fecha_egreso: null },
+        },
+        Responsable: true,
+        Cuenta: true,
+      },
+    });
+
+    if (!miembro || !miembro.Cuenta) {
+      throw new NotFoundException('Miembro o cuenta no encontrada.');
+    }
+
+    // Cast explicitly to help the compiler if needed, though findUnique should suffice
+    const m = miembro as any;
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Limpiar roles actuales que son automáticos
+      // No borramos roles especiales como ADM, DEV, OWN que se asignan manualmente
+      const systemRoles = ['ADM', 'DEV', 'OWN'];
+      await tx.cuentaRole.deleteMany({
+        where: {
+          id_cuenta: m.id_cuenta,
+          Role: {
+            nombre: {
+              notIn: systemRoles,
+            },
+          },
+        },
+      });
+
+      // 2. Sincronizar según perfil de Adulto
+      if (m.Adulto && m.Adulto.EquipoArea.length > 0) {
+        const assignment = m.Adulto.EquipoArea[0];
+        try {
+          const roleInfo = await this.resolveAdultRole(tx, assignment);
+
+          await tx.cuentaRole.create({
+            data: {
+              id_cuenta: m.id_cuenta,
+              id_role: roleInfo.role.id,
+              tipo_scope: roleInfo.scopeType,
+              id_scope: roleInfo.scopeId,
+            },
+          });
+        } catch (e) {
+          // Si no se puede determinar el rol, ignoramos (ej: área no mapeada)
+          console.error('Error resolveAdultRole:', e);
+        }
+      }
+
+      // 3. Sincronizar según perfil de Protagonista
+      if (m.Protagonista && m.MiembroRama.length > 0) {
+        const ramaId = m.MiembroRama[0].id_rama;
+        const role = await tx.role.findUnique({
+          where: { nombre: 'PROTAGONISTA' },
+        });
+
+        if (role) {
+          await tx.cuentaRole.create({
+            data: {
+              id_cuenta: m.id_cuenta,
+              id_role: role.id,
+              tipo_scope: SCOPE.RAMA,
+              id_scope: ramaId,
+            },
+          });
+        }
+      }
+
+      // 4. Sincronizar según perfil de Responsable
+      if (m.Responsable) {
+        const role = await tx.role.findUnique({
+          where: { nombre: 'RESPONSABLE' },
+        });
+
+        if (role) {
+          const ramaIds = await this.getResponsableRamaIdsForSync(
+            tx,
+            m.Responsable.id,
+          );
+          let scopeType: SCOPE = SCOPE.OWN;
+          let scopeId: number | null = null;
+
+          if (ramaIds.length === 1) {
+            scopeType = SCOPE.RAMA;
+            scopeId = ramaIds[0];
+          }
+
+          await tx.cuentaRole.create({
+            data: {
+              id_cuenta: m.id_cuenta,
+              id_role: role.id,
+              tipo_scope: scopeType,
+              id_scope: scopeId,
+            },
+          });
+        }
+      }
+
+      return {
+        success: true,
+        message: 'Permisos sincronizados correctamente.',
+      };
+    });
+  }
+
+  private async resolveAdultRole(
+    tx: Prisma.TransactionClient,
+    assignment: Prisma.EquipoAreaGetPayload<{
+      include: { Area: true; Posicion: true; Rama: true };
+    }>,
+  ) {
+    let roleName: string | null = null;
+    let scopeType: SCOPE = SCOPE.AREA;
+    let scopeId: number | null = assignment.id_area;
+
+    if (assignment.Area.nombre === 'Rama') {
+      roleName =
+        assignment.Posicion.nombre === 'Ayudante'
+          ? 'AYUDANTE_RAMA'
+          : 'JEFATURA_RAMA';
+      scopeType = SCOPE.RAMA;
+      scopeId = assignment.id_rama;
+    } else if (assignment.Area.nombre === 'Jefatura') {
+      roleName =
+        assignment.Posicion.nombre === 'Ayudante' ? 'AYUDANTE' : 'JEFATURA';
+      scopeType = SCOPE.GRUPO;
+      scopeId = null;
+    } else if (assignment.Area.nombre === 'Secretaria y Tesoreria') {
+      roleName = 'SECRETARIA_TESORERIA';
+      scopeType = SCOPE.GRUPO;
+      scopeId = null;
+    } else if (assignment.Area.nombre === 'Intendencia') {
+      roleName = 'INTENDENCIA';
+      scopeType = SCOPE.GRUPO;
+      scopeId = null;
+    }
+
+    if (!roleName) {
+      throw new BadRequestException('No se pudo determinar el rol automático.');
+    }
+
+    const role = await tx.role.findUnique({ where: { nombre: roleName } });
+    if (!role) throw new NotFoundException(`Rol ${roleName} no encontrado.`);
+
+    return { role, scopeType, scopeId };
+  }
+
+  private async getResponsableRamaIdsForSync(
+    tx: Prisma.TransactionClient,
+    responsableId: number,
+  ) {
+    const responsabilidades = await tx.responsabilidad.findMany({
+      where: { id_responsable: responsableId, borrado: false },
+      include: {
+        Protagonista: {
+          include: {
+            Miembro: {
+              include: {
+                MiembroRama: {
+                  where: { borrado: false, fecha_egreso: null },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return [
+      ...new Set(
+        responsabilidades.flatMap((r) =>
+          r.Protagonista.Miembro.MiembroRama.map((mr) => mr.id_rama),
+        ),
+      ),
+    ];
+  }
+
   private async resolveOwnMemberId(user: AuthenticatedUser) {
     const miembro = await this.prisma.miembro.findFirst({
       where: {
