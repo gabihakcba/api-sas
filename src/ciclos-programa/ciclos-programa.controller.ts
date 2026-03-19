@@ -11,6 +11,7 @@ import {
   Post,
   Query,
   Request,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { CheckPermissions } from '../auth/decorators/permissions.decorator';
@@ -21,6 +22,7 @@ import { CiclosProgramaService } from './ciclos-programa.service';
 import { CiclosProgramaQueryDto } from './dto/ciclos-programa-query.dto';
 import { CreateCicloProgramaDto } from './dto/create-ciclo-programa.dto';
 import { UpdateCicloProgramaDto } from './dto/update-ciclo-programa.dto';
+import { Response } from 'express';
 
 @Controller('ciclos-programa')
 export class CiclosProgramaController {
@@ -51,6 +53,23 @@ export class CiclosProgramaController {
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.ciclosProgramaService.findOne(id, req.user!);
+  }
+
+  @Get(':id/export/pdf')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('READ:CICLO_PROGRAMA')
+  async exportPdf(
+    @Request() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.ciclosProgramaService.exportPdf(id, req.user!);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${pdf.filename}"`,
+    );
+    res.send(pdf.buffer);
   }
 
   @Post()

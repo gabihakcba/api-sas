@@ -6,7 +6,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ESTADO_TEMARIO, Prisma } from '@prisma/client';
-import PDFDocument = require('pdfkit');
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import { hasSoftDeleteAuditAccess } from '../auth/utils/unrestricted-access.util';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
@@ -19,6 +18,11 @@ import { ConsejoAsistenciaOptionsQueryDto } from './dto/consejo-asistencia-optio
 import { CreateAsistenciaConsejoDto } from './dto/create-asistencia-consejo.dto';
 import { UpdateConsejoModeradorDto } from './dto/update-consejo-moderador.dto';
 import { UpdateConsejoSecretariaDto } from './dto/update-consejo-secretaria.dto';
+import {
+  escapeHtml,
+  renderHtmlToPdf,
+  sanitizeHtmlForPdf,
+} from '../common/pdf/render-html-to-pdf';
 
 type AttendanceMember = {
   id: number;
@@ -176,7 +180,8 @@ export class ConsejosService {
       idConsejo,
       allowPrivateTopics,
     );
-    const buffer = await this.buildPdfBuffer(consejo, allowPrivateTopics);
+    const html = this.buildConsejoPdfHtml(consejo, allowPrivateTopics);
+    const buffer = await renderHtmlToPdf(html);
     const slug = consejo.nombre
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
@@ -841,11 +846,11 @@ export class ConsejosService {
   private normalizeTemarioCreatePayload(dto: CreateTemarioConsejoDto) {
     const titulo = dto.titulo.trim().replace(/\s+/g, ' ');
     const descripcion = dto.descripcion?.trim() || null;
-    const debate = dto.debate?.trim()
-      ? this.sanitizeRichTextHtml(dto.debate.trim())
+    const debate = dto.debate
+      ? this.sanitizeRichTextHtml(dto.debate)
       : null;
-    const acuerdo = dto.acuerdo?.trim()
-      ? this.sanitizeRichTextHtml(dto.acuerdo.trim())
+    const acuerdo = dto.acuerdo
+      ? this.sanitizeRichTextHtml(dto.acuerdo)
       : null;
 
     if (titulo.length < 3) {
@@ -882,14 +887,14 @@ export class ConsejosService {
         : undefined;
     const debate =
       dto.debate !== undefined
-        ? dto.debate.trim()
-          ? this.sanitizeRichTextHtml(dto.debate.trim())
+        ? dto.debate
+          ? this.sanitizeRichTextHtml(dto.debate)
           : null
         : undefined;
     const acuerdo =
       dto.acuerdo !== undefined
-        ? dto.acuerdo.trim()
-          ? this.sanitizeRichTextHtml(dto.acuerdo.trim())
+        ? dto.acuerdo
+          ? this.sanitizeRichTextHtml(dto.acuerdo)
           : null
         : undefined;
 
@@ -1050,444 +1055,117 @@ export class ConsejosService {
     };
   }
 
-  private async buildPdfBuffer(
+  private buildConsejoPdfHtml(
     consejo: ConsejoExportData,
     includePrivateTopics: boolean,
-  ): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      const doc = new PDFDocument({
-        size: 'A4',
-        margin: 48,
-      });
+  ): string {
+    const asistentesHtml =
+      consejo.AsistenciaConsejo.length > 0
+        ? `<ol>${consejo.AsistenciaConsejo.map((asistencia) => {
+            const miembro = asistencia.Miembro;
+            const descripcion = asistencia.descripcion?.trim();
+            const descriptionSuffix = descripcion
+              ? ` (${escapeHtml(descripcion)})`
+              : '';
 
-      doc.on('data', (chunk: Buffer) => {
-        chunks.push(chunk);
-      });
-      doc.on('end', () => {
-        resolve(Buffer.concat(chunks));
-      });
-      doc.on('error', reject);
+            return `<li><strong>${escapeHtml(
+              `${miembro.apellidos}, ${miembro.nombre}`,
+            )}</strong>${descriptionSuffix}</li>`;
+          }).join('')}</ol>`
+        : '<p>No se registraron asistencias.</p>';
 
-      this.drawPdfHeader(doc, consejo, includePrivateTopics);
-      this.drawPdfAttendees(doc, consejo);
-      this.drawPdfTemario(doc, consejo);
+    const temasHtml =
+      consejo.TemarioConsejo.length > 0
+        ? consejo.TemarioConsejo.map((tema) => {
+            const descripcion = tema.descripcion?.trim();
+            const debate = sanitizeHtmlForPdf(tema.debate ?? '');
+            const acuerdo = sanitizeHtmlForPdf(tema.acuerdo ?? '');
 
-      doc.end();
-    });
-  }
+            return `
+              <section class="tema">
+                <h3>${escapeHtml(tema.titulo)}</h3>
+                <p class="meta">
+                  Estado: ${escapeHtml(this.formatEstado(tema.estado))}
+                  · Visibilidad: ${tema.sin_mp ? 'Solo educadores' : 'Publico'}
+                </p>
+                ${
+                  descripcion
+                    ? `<p><strong>Descripcion:</strong> ${escapeHtml(descripcion)}</p>`
+                    : '<p><strong>Descripcion:</strong> Sin descripcion.</p>'
+                }
+                <h4>Debate</h4>
+                <div class="rich-content">${debate || '<p>Sin contenido.</p>'}</div>
+                <h4>Acuerdo</h4>
+                <div class="rich-content">${acuerdo || '<p>Sin contenido.</p>'}</div>
+              </section>
+            `;
+          }).join('')
+        : '<p>No hay temas cargados para exportar.</p>';
 
-  private drawPdfHeader(
-    doc: InstanceType<typeof PDFDocument>,
-    consejo: ConsejoExportData,
-    includePrivateTopics: boolean,
-  ) {
-    doc
-      .fillColor('#0f172a')
-      .font('Helvetica-Bold')
-      .fontSize(20)
-      .text(consejo.nombre);
+    const moderador = consejo.Moderador
+      ? `${consejo.Moderador.apellidos}, ${consejo.Moderador.nombre}`
+      : 'Sin asignar';
+    const secretario = consejo.Secretario
+      ? `${consejo.Secretario.apellidos}, ${consejo.Secretario.nombre}`
+      : 'Sin asignar';
+    const prosecretario = consejo.Prosecretario
+      ? `${consejo.Prosecretario.apellidos}, ${consejo.Prosecretario.nombre}`
+      : 'Sin asignar';
 
-    doc
-      .fillColor('#334155')
-      .font('Helvetica')
-      .fontSize(11)
-      .text(`Fecha: ${this.formatDate(consejo.fecha)}`)
-      .text(`Version: ${includePrivateTopics ? 'Completa' : 'PDF'}`);
-
-    if (consejo.descripcion) {
-      doc
-        .fillColor('#1e293b')
-        .fontSize(10)
-        .text(consejo.descripcion);
-    }
-
-    doc.moveDown(1);
-  }
-
-  private drawPdfAttendees(
-    doc: InstanceType<typeof PDFDocument>,
-    consejo: ConsejoExportData,
-  ) {
-    doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(13).text('Participantes');
-
-    if (consejo.AsistenciaConsejo.length === 0) {
-      doc.moveDown(0.3).fillColor('#475569').font('Helvetica').fontSize(11).text('Sin asistencias registradas.');
-      doc.moveDown(1);
-      return;
-    }
-
-    consejo.AsistenciaConsejo.forEach((asistencia) => {
-      doc
-        .fillColor('#1f2937')
-        .font('Helvetica')
-        .fontSize(11)
-        .text(
-          `- ${asistencia.Miembro.apellidos}, ${asistencia.Miembro.nombre} (${asistencia.descripcion})`,
-        );
-    });
-
-    doc.moveDown(1);
-  }
-
-  private drawPdfTemario(
-    doc: InstanceType<typeof PDFDocument>,
-    consejo: ConsejoExportData,
-  ) {
-    doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(13).text('Temario');
-    doc.moveDown(0.5);
-
-    if (consejo.TemarioConsejo.length === 0) {
-      doc.fillColor('#475569').font('Helvetica').fontSize(11).text('Sin temas registrados.');
-      return;
-    }
-
-    consejo.TemarioConsejo.forEach((tema, index) => {
-      const width =
-        doc.page.width - doc.page.margins.left - doc.page.margins.right;
-      const debateText = tema.debate?.trim()
-        ? tema.debate
-        : 'Sin debate cargado.';
-      const acuerdoText = tema.acuerdo?.trim()
-        ? tema.acuerdo
-        : 'Sin acuerdo cargado.';
-
-      doc
-        .fillColor('#0f172a')
-        .font('Helvetica-Bold')
-        .fontSize(12)
-        .text(`${index + 1}. ${tema.titulo}`, {
-          width,
-        });
-
-      doc
-        .fillColor('#475569')
-        .font('Helvetica')
-        .fontSize(10)
-        .text(`Estado: ${this.formatEstado(tema.estado)}`);
-
-      if (tema.descripcion) {
-        doc
-          .moveDown(0.2)
-          .fillColor('#334155')
-          .font('Helvetica')
-          .fontSize(10)
-          .text(tema.descripcion, {
-            width,
-          });
-      }
-
-      doc.moveDown(0.4);
-      doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(11).text('Debate');
-      this.renderRichTextBlock(
-        doc,
-        debateText,
-        doc.page.margins.left,
-        doc.y + 4,
-        width,
-      );
-
-      doc.moveDown(0.6);
-      doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(11).text('Acuerdo');
-      this.renderRichTextBlock(
-        doc,
-        acuerdoText,
-        doc.page.margins.left,
-        doc.y + 4,
-        width,
-      );
-
-      doc.moveDown(1);
-    });
-  }
-
-  private measureRichTextHeight(
-    doc: InstanceType<typeof PDFDocument>,
-    html: string,
-    width: number,
-  ) {
-    const blocks = this.parseRichTextBlocks(html);
-
-    return blocks.reduce((total, block) => {
-      const text = block.runs.map((run) => run.text).join('') || ' ';
-      const blockStyle = this.getRichTextBlockStyle(block.type);
-      const fontName =
-        blockStyle.bold
-          ? 'Helvetica-Bold'
-          : 'Helvetica';
-      doc.font(fontName).fontSize(blockStyle.fontSize);
-      const blockHeight = doc.heightOfString(text, {
-        width,
-        align: 'left',
-      });
-
-      return total + blockStyle.spacingBefore + Math.max(blockHeight, 18) + blockStyle.spacingAfter;
-    }, 0);
-  }
-
-  private renderRichTextBlock(
-    doc: InstanceType<typeof PDFDocument>,
-    html: string,
-    x: number,
-    y: number,
-    width: number,
-  ) {
-    const blocks = this.parseRichTextBlocks(html);
-    let cursorY = y;
-
-    blocks.forEach((block) => {
-      const blockStyle = this.getRichTextBlockStyle(block.type);
-      const prefix =
-        block.type === 'ordered'
-          ? `${block.index}. `
-          : block.type === 'bullet'
-            ? '• '
-            : '';
-
-      cursorY += blockStyle.spacingBefore;
-
-      let lineX = x;
-
-      if (prefix) {
-        doc
-          .fillColor(blockStyle.color)
-          .font('Helvetica')
-          .fontSize(blockStyle.fontSize)
-          .text(prefix, x, cursorY);
-        lineX = x + doc.widthOfString(prefix);
-      }
-
-      if (block.runs.length === 0) {
-        doc
-          .fillColor(blockStyle.color)
-          .font(blockStyle.bold ? 'Helvetica-Bold' : 'Helvetica')
-          .fontSize(blockStyle.fontSize)
-          .text(' ', lineX, cursorY);
-      } else {
-        block.runs.forEach((run, index) => {
-          const effectiveBold = blockStyle.bold || run.bold;
-          const fontName =
-            effectiveBold && run.italic
-              ? 'Helvetica-BoldOblique'
-              : effectiveBold
-                ? 'Helvetica-Bold'
-                : run.italic
-                  ? 'Helvetica-Oblique'
-                  : 'Helvetica';
-
-          doc
-            .fillColor(run.link ? '#2563eb' : blockStyle.color)
-            .font(fontName)
-            .fontSize(blockStyle.fontSize)
-            .text(run.text || ' ', index === 0 ? lineX : undefined, cursorY, {
-              width: index === 0 ? width - (lineX - x) : undefined,
-              continued: index !== block.runs.length - 1,
-              underline: run.underline || Boolean(run.link),
-              ...(run.link ? { link: run.link } : {}),
-            });
-        });
-      }
-
-      doc.text('', { continued: false });
-      cursorY = doc.y + blockStyle.spacingAfter;
-    });
-
-    return cursorY;
-  }
-
-  private parseRichTextBlocks(html: string): Array<{
-    type: 'paragraph' | 'ordered' | 'bullet' | 'heading1' | 'heading2';
-    index: number;
-    runs: Array<{
-      text: string;
-      bold: boolean;
-      italic: boolean;
-      underline: boolean;
-      link?: string;
-    }>;
-  }> {
-    const normalized = this.normalizeRichHtml(html);
-    const blockPattern = /<(h1|h2|p|li)([^>]*)>([\s\S]*?)<\/\1>/gi;
-    const blocks: Array<{
-      type: 'paragraph' | 'ordered' | 'bullet' | 'heading1' | 'heading2';
-      index: number;
-      runs: Array<{
-        text: string;
-        bold: boolean;
-        italic: boolean;
-        underline: boolean;
-        link?: string;
-      }>;
-    }> = [];
-    let orderedIndex = 0;
-    let match: RegExpExecArray | null;
-
-    while ((match = blockPattern.exec(normalized)) !== null) {
-      const tag = match[1].toLowerCase();
-      let type: 'paragraph' | 'ordered' | 'bullet' | 'heading1' | 'heading2' =
-        'paragraph';
-
-      if (tag === 'h1') {
-        type = 'heading1';
-      } else if (tag === 'h2') {
-        type = 'heading2';
-      } else if (tag === 'li') {
-        type = /data-list="ordered"/i.test(match[2]) ? 'ordered' : 'bullet';
-      }
-
-      if (type === 'ordered') {
-        orderedIndex += 1;
-      } else {
-        orderedIndex = 0;
-      }
-
-      blocks.push({
-        type,
-        index: type === 'ordered' ? orderedIndex : blocks.length + 1,
-        runs: this.extractRichTextRuns(match[3]),
-      });
-    }
-
-    if (blocks.length > 0) {
-      return blocks;
-    }
-
-    return [
-      {
-        type: 'paragraph',
-        index: 1,
-        runs: this.extractRichTextRuns(normalized),
-      },
-    ];
-  }
-
-  private normalizeRichHtml(html: string) {
-    return html
-      .replace(/<p><br><\/p>/gi, '<p></p>')
-      .replace(/<div>/gi, '<p>')
-      .replace(/<\/div>/gi, '</p>')
-      .replace(/<ol>/gi, '')
-      .replace(/<\/ol>/gi, '')
-      .replace(/<ul>/gi, '')
-      .replace(/<\/ul>/gi, '');
-  }
-
-  private getRichTextBlockStyle(
-    type: 'paragraph' | 'ordered' | 'bullet' | 'heading1' | 'heading2',
-  ) {
-    switch (type) {
-      case 'heading1':
-        return {
-          fontSize: 15,
-          bold: true,
-          color: '#0f172a',
-          spacingBefore: 4,
-          spacingAfter: 8,
-        };
-      case 'heading2':
-        return {
-          fontSize: 12,
-          bold: true,
-          color: '#1e293b',
-          spacingBefore: 2,
-          spacingAfter: 6,
-        };
-      default:
-        return {
-          fontSize: 10,
-          bold: false,
-          color: '#334155',
-          spacingBefore: 0,
-          spacingAfter: 4,
-        };
-    }
-  }
-
-  private extractRichTextRuns(html: string) {
-    const runs: Array<{
-      text: string;
-      bold: boolean;
-      italic: boolean;
-      underline: boolean;
-      link?: string;
-    }> = [];
-
-    const sanitized = html
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>');
-
-    const tagPattern = /<(\/?)(strong|b|em|i|u|a)(?:\s+[^>]*)?>/gi;
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-    let bold = false;
-    let italic = false;
-    let underline = false;
-    let link: string | undefined;
-
-    while ((match = tagPattern.exec(sanitized)) !== null) {
-      const plainText = sanitized.slice(lastIndex, match.index).replace(/<[^>]+>/g, '');
-
-      if (plainText) {
-        runs.push({
-          text: plainText,
-          bold,
-          italic,
-          underline,
-          ...(link ? { link } : {}),
-        });
-      }
-
-      const isClosing = match[1] === '/';
-      const tag = match[2].toLowerCase();
-
-      if (tag === 'strong' || tag === 'b') {
-        bold = !isClosing;
-      }
-
-      if (tag === 'em' || tag === 'i') {
-        italic = !isClosing;
-      }
-
-      if (tag === 'u') {
-        underline = !isClosing;
-      }
-
-      if (tag === 'a') {
-        if (isClosing) {
-          link = undefined;
-        } else {
-          link = this.extractLinkHref(match[0]);
-        }
-      }
-
-      lastIndex = tagPattern.lastIndex;
-    }
-
-    const remainingText = sanitized.slice(lastIndex).replace(/<[^>]+>/g, '');
-
-    if (remainingText) {
-      runs.push({
-        text: remainingText,
-        bold,
-        italic,
-        underline,
-        ...(link ? { link } : {}),
-      });
-    }
-
-    if (runs.length === 0) {
-      runs.push({
-        text: '',
-        bold: false,
-        italic: false,
-        underline: false,
-      });
-    }
-
-    return runs;
+    return `
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8" />
+        <style>
+          body { font-family: Arial, sans-serif; color: #1f2937; font-size: 12px; line-height: 1.5; }
+          h1 { font-size: 22px; margin: 0 0 4px 0; }
+          h2 { font-size: 16px; margin: 20px 0 8px 0; }
+          h3 { font-size: 14px; margin: 0; }
+          h4 { font-size: 13px; margin: 12px 0 6px; }
+          p { margin: 0 0 8px 0; white-space: pre-wrap; }
+          .muted { color: #6b7280; }
+          .meta { color: #4b5563; margin-top: 4px; }
+          .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 14px; page-break-inside: avoid; }
+          .rich-content { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; }
+          .rich-content ul, .rich-content ol { margin: 0 0 8px 20px; padding-left: 20px; }
+          .rich-content li { margin: 3px 0; }
+          .rich-content h1, .rich-content h2, .rich-content h3 { margin: 8px 0 4px; }
+          .rich-content p { margin: 0 0 8px 0; }
+          .tema { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; page-break-inside: avoid; }
+        </style>
+      </head>
+      <body>
+        <header>
+          <h1>${escapeHtml(consejo.nombre)}</h1>
+          <p class="muted">
+            Fecha: ${escapeHtml(this.formatDate(consejo.fecha))}
+            · Tipo: ${consejo.es_ordinario ? 'Ordinario' : 'Extraordinario'}
+            · PDF: ${includePrivateTopics ? 'Completo' : 'Publico'}
+          </p>
+          <p>${escapeHtml(consejo.descripcion ?? 'Sin descripcion cargada.')}</p>
+          <p>
+            <strong>Horario:</strong> ${escapeHtml(
+              this.formatTimeRange(consejo.hora_inicio, consejo.hora_fin),
+            )}
+          </p>
+          <p>
+            <strong>Moderador:</strong> ${escapeHtml(moderador)} ·
+            <strong>Secretario:</strong> ${escapeHtml(secretario)} ·
+            <strong>Prosecretario:</strong> ${escapeHtml(prosecretario)}
+          </p>
+        </header>
+        <section class="card">
+          <h2>Asistencias</h2>
+          ${asistentesHtml}
+        </section>
+        <section>
+          <h2>Temario</h2>
+          ${temasHtml}
+        </section>
+      </body>
+      </html>
+    `;
   }
 
   private sanitizeRichTextHtml(html: string) {
@@ -1503,16 +1181,6 @@ export class ConsejosService {
         return `<a${before}href=${quote}${normalizedHref}${quote}${after}>`;
       },
     );
-  }
-
-  private extractLinkHref(tag: string) {
-    const hrefMatch = tag.match(/href=(["'])(.*?)\1/i);
-
-    if (!hrefMatch) {
-      return undefined;
-    }
-
-    return this.normalizeAllowedLink(hrefMatch[2]);
   }
 
   private normalizeAllowedLink(href: string) {
