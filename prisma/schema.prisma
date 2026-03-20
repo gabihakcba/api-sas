@@ -70,6 +70,7 @@ model Miembro {
   InscripcionEvento     InscripcionEvento[]     @relation(name: "InscripcionEventoMiembro")
   Pago                  Pago[]                  @relation(name: "PagoMiembro")
   PagoResponsable       Pago[]                  @relation(name: "PagoResponsable")
+  MovimientoCuenta      MovimientoCuenta[]      @relation(name: "MovimientoCuentaResponsable")
   AsistenciaConsejo     AsistenciaConsejo[]     @relation(name: "AsistenciaMiembro")
   CuentaDinero          CuentaDinero[]          @relation(name: "CuentaMiembro")
   ConsejoModerado       Consejo[]               @relation(name: "ConsejoModerador")
@@ -585,7 +586,8 @@ model MetodoPago {
   updatedAt DateTime @updatedAt
 
   // Relations
-  Pago Pago[] @relation(name: "PagoMetodoPago")
+  Pago            Pago[]            @relation(name: "PagoMetodoPago")
+  MovimientoCuenta MovimientoCuenta[] @relation(name: "MovimientoCuentaMetodoPago")
 }
 
 model CuentaDinero {
@@ -609,8 +611,59 @@ model CuentaDinero {
   Miembro Miembro? @relation(fields: [id_miembro], references: [id], name: "CuentaMiembro")
 
   // Relations
-  Pago       Pago[] @relation(name: "PagoCuentaDinero")
-  PagoOrigen Pago[] @relation(name: "PagoCuentaOrigen")
+  Pago             Pago[]             @relation(name: "PagoCuentaDinero")
+  PagoOrigen       Pago[]             @relation(name: "PagoCuentaOrigen")
+  MovimientoCuenta MovimientoCuenta[] @relation(name: "MovimientoCuentaCuentaDinero")
+}
+
+enum TIPO_MOVIMIENTO_CUENTA {
+  INGRESO
+  EGRESO
+}
+
+model MovimientoCuenta {
+  id                Int                    @id @default(autoincrement())
+  monto             Decimal                @db.Decimal(15, 2)
+  tipo              TIPO_MOVIMIENTO_CUENTA
+  detalles          String?
+  fecha_movimiento  DateTime               @default(now())
+  saldo_anterior    Decimal                @db.Decimal(15, 2)
+  saldo_posterior   Decimal                @db.Decimal(15, 2)
+  codigo_referencia String                 @unique @default(uuid())
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_cuenta_dinero Int
+  id_responsable   Int
+  id_metodo_pago   Int
+
+  // Foreign key relations
+  CuentaDinero CuentaDinero @relation(fields: [id_cuenta_dinero], references: [id], name: "MovimientoCuentaCuentaDinero")
+  Responsable  Miembro      @relation(fields: [id_responsable], references: [id], name: "MovimientoCuentaResponsable")
+  MetodoPago   MetodoPago   @relation(fields: [id_metodo_pago], references: [id], name: "MovimientoCuentaMetodoPago")
+
+  // Relations
+  Adjuntos MovimientoCuentaAdjunto[] @relation(name: "MovimientoCuentaAdjuntoMovimiento")
+}
+
+model MovimientoCuentaAdjunto {
+  id             Int    @id @default(autoincrement())
+  archivo        Bytes
+  mime           String
+  nombre         String
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_movimiento_cuenta Int
+
+  // Foreign key relations
+  MovimientoCuenta MovimientoCuenta @relation(fields: [id_movimiento_cuenta], references: [id], name: "MovimientoCuentaAdjuntoMovimiento")
 }
 
 //

@@ -17,6 +17,18 @@ const ADULT_ACCOUNT_SCOPE_ROLES = new Set([
   'INTENDENCIA',
 ]);
 
+const ADULT_CUENTA_DINERO_READ_ROLES = new Set([
+  'ADM',
+  'DEV',
+  'AYUDANTE',
+  'JEFATURA',
+  'SECRETARIA_TESORERIA',
+  'JEFATURA_RAMA',
+  'AYUDANTE_RAMA',
+  'INTENDENCIA',
+  'OWN',
+]);
+
 @Injectable()
 export class ScopeFilterService {
   forProtagonistas(
@@ -94,23 +106,25 @@ export class ScopeFilterService {
       return {};
     }
 
-    const groupCashFilter: Prisma.CuentaDineroWhereInput = {
-      id_miembro: null,
-      id_rama: null,
-      Area: {
-        nombre: 'Jefatura',
-        borrado: false,
-      },
-    };
+    const groupCashFilter: Prisma.CuentaDineroWhereInput =
+      this.hasAdultCuentaDineroReadAccess(user)
+        ? {
+            id_miembro: null,
+            id_rama: null,
+            Area: {
+              nombre: 'Jefatura',
+              borrado: false,
+            },
+          }
+        : { id: -1 };
 
-    const memberProfileWhere = this.buildCuentaDineroMemberProfileFilters(user);
     const scopeFilters = this.buildCuentaDineroFilters(user);
 
-    return this.toWhereInput([
-      groupCashFilter,
-      ...scopeFilters,
-      ...memberProfileWhere,
-    ]);
+    if (scopeFilters.length === 0) {
+      return groupCashFilter;
+    }
+
+    return this.toWhereInput([groupCashFilter, ...scopeFilters]);
   }
 
   mergeWhere<TWhere extends object>(
@@ -143,6 +157,12 @@ export class ScopeFilterService {
 
   private hasUnrestrictedCuentaDineroAccess(user: AuthenticatedUser): boolean {
     return hasUnrestrictedAccess(user);
+  }
+
+  private hasAdultCuentaDineroReadAccess(user: AuthenticatedUser): boolean {
+    return user.scopes.some((scope) =>
+      ADULT_CUENTA_DINERO_READ_ROLES.has(scope.role),
+    );
   }
 
   private buildProtagonistaFilters(
@@ -613,24 +633,6 @@ export class ScopeFilterService {
             },
             {
               Miembro: {
-                Adulto: {
-                  is: {
-                    borrado: false,
-                    activo: true,
-                    EquipoArea: {
-                      some: {
-                        id_rama: scope.scopeId,
-                        borrado: false,
-                        activo: true,
-                        fecha_fin: null,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            {
-              Miembro: {
                 Responsable: {
                   is: {
                     borrado: false,
@@ -658,165 +660,6 @@ export class ScopeFilterService {
           ],
         });
       }
-
-      if (scope.scopeType === SCOPE.AREA) {
-        filters.push({
-          OR: [
-            { id_area: scope.scopeId },
-            {
-              Rama: {
-                id_area: scope.scopeId,
-                borrado: false,
-              },
-            },
-            {
-              Miembro: {
-                Protagonista: {
-                  is: {
-                    borrado: false,
-                    Miembro: {
-                      MiembroRama: {
-                        some: {
-                          borrado: false,
-                          fecha_egreso: null,
-                          Rama: {
-                            id_area: scope.scopeId,
-                            borrado: false,
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            {
-              Miembro: {
-                Adulto: {
-                  is: {
-                    borrado: false,
-                    activo: true,
-                    EquipoArea: {
-                      some: {
-                        borrado: false,
-                        activo: true,
-                        fecha_fin: null,
-                        OR: [
-                          { id_area: scope.scopeId },
-                          {
-                            Rama: {
-                              id_area: scope.scopeId,
-                              borrado: false,
-                            },
-                          },
-                        ],
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            {
-              Miembro: {
-                Responsable: {
-                  is: {
-                    borrado: false,
-                    Responsabilidad: {
-                      some: {
-                        borrado: false,
-                        Protagonista: {
-                          borrado: false,
-                          Miembro: {
-                            MiembroRama: {
-                              some: {
-                                borrado: false,
-                                fecha_egreso: null,
-                                Rama: {
-                                  id_area: scope.scopeId,
-                                  borrado: false,
-                                },
-                              },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          ],
-        });
-      }
-    }
-
-    return filters;
-  }
-
-  private buildCuentaDineroMemberProfileFilters(
-    user: AuthenticatedUser,
-  ): Prisma.CuentaDineroWhereInput[] {
-    const filters: Prisma.CuentaDineroWhereInput[] = [];
-
-    if (user.roles.includes('PROTAGONISTA')) {
-      filters.push({
-        Miembro: {
-          id_cuenta: user.userId,
-          borrado: false,
-          Protagonista: {
-            is: {
-              borrado: false,
-              activo: true,
-            },
-          },
-        },
-      });
-
-      filters.push({
-        Rama: {
-          MiembroRama: {
-            some: {
-              borrado: false,
-              fecha_egreso: null,
-              Miembro: {
-                borrado: false,
-                id_cuenta: user.userId,
-                Protagonista: {
-                  is: {
-                    borrado: false,
-                    activo: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
-    }
-
-    if (user.roles.includes('RESPONSABLE')) {
-      filters.push({
-        Miembro: {
-          borrado: false,
-          Protagonista: {
-            is: {
-              borrado: false,
-              Responsabilidad: {
-                some: {
-                  borrado: false,
-                  Responsable: {
-                    Miembro: {
-                      id_cuenta: user.userId,
-                      borrado: false,
-                    },
-                    borrado: false,
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
     }
 
     return filters;
