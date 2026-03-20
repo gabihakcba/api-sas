@@ -358,7 +358,12 @@ export class SabatinosService {
   }
 
   async exportPdf(id: number, user: AuthenticatedUser): Promise<Buffer> {
-    const sabatino = await this.findOne(id, user);
+    const [sabatino, config] = await Promise.all([
+      this.findOne(id, user),
+      this.prisma.configuracionGrupo.findFirst({ where: { id: 1 } }),
+    ]);
+
+    const groupName = config?.nombre_grupo?.trim() || 'Grupo Scout';
 
     const educadores = sabatino.Educadores.map(
       (e) => `${e.Adulto.Miembro.apellidos}, ${e.Adulto.Miembro.nombre}`,
@@ -390,6 +395,7 @@ export class SabatinosService {
           <td style="text-align: center;">${new Intl.DateTimeFormat('es-AR', {
             hour: '2-digit',
             minute: '2-digit',
+            timeZone: 'America/Argentina/Buenos_Aires',
           }).format(new Date(row.fecha))}</td>
           <td style="text-align: center;">${row.numero || '-'}</td>
           <td><strong>${escapeHtml(act.nombre)}</strong></td>
@@ -433,6 +439,7 @@ export class SabatinosService {
               ${new Intl.DateTimeFormat('es-AR', {
                 hour: '2-digit',
                 minute: '2-digit',
+                timeZone: 'America/Argentina/Buenos_Aires',
               }).format(new Date(row.fecha))} | 
               ${escapeHtml(act.Tipo.nombre)} | 
               Resp: ${escapeHtml(responsables)}
@@ -506,10 +513,10 @@ export class SabatinosService {
             <h1>Planificación Sabatina: ${escapeHtml(sabatino.titulo)}</h1>
             <div class="info-grid">
               <div class="info-item">
-                <span class="info-label">Lugar:</span> <span>Grupo Scout Adalberto O. Lopez</span>
+                <span class="info-label">Lugar:</span> <span>${escapeHtml(groupName)}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">Fecha:</span> <span>${new Intl.DateTimeFormat(
+                <span className="info-label">Fecha:</span> <span>${new Intl.DateTimeFormat(
                   'es-AR',
                   {
                     day: '2-digit',
@@ -517,14 +524,16 @@ export class SabatinosService {
                     year: 'numeric',
                     hour: '2-digit',
                     minute: '2-digit',
+                    timeZone: 'America/Argentina/Buenos_Aires',
                   },
                 ).format(new Date(sabatino.fecha_inicio))} - ${new Intl.DateTimeFormat(
-      'es-AR',
-      {
-        hour: '2-digit',
-        minute: '2-digit',
-      },
-    ).format(new Date(sabatino.fecha_fin))}</span>
+              'es-AR',
+              {
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'America/Argentina/Buenos_Aires',
+              },
+              ).format(new Date(sabatino.fecha_fin))}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Ramas:</span> <span>${escapeHtml(

@@ -1312,8 +1312,7 @@ export class PagosService {
         : null;
 
     return {
-      groupName:
-        config?.nombre_grupo?.trim() || 'Grupo Scout Adalberto O. Lopez 494',
+      groupName: config?.nombre_grupo?.trim() || 'Grupo Scout',
       logoPath:
         configuredLogoPath && existsSync(configuredLogoPath)
           ? configuredLogoPath

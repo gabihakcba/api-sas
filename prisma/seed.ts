@@ -1225,7 +1225,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
 const ADMIN_DNI = '00000000';
 const DEV_DNI = '11111111';
 const DEFAULT_GROUP_NAME =
-  process.env.GRUPO_NOMBRE?.trim() || 'Grupo Scout Adalberto O. Lopez 494';
+  process.env.GRUPO_NOMBRE?.trim() || 'Grupo Scout';
 
 function getRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();

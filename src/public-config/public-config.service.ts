@@ -14,7 +14,7 @@ interface UploadedBrandingFile {
 }
 
 const DEFAULT_GROUP_NAME =
-  process.env.GRUPO_NOMBRE?.trim() || 'Grupo Scout Adalberto O. Lopez 494';
+  process.env.GRUPO_NOMBRE?.trim() || 'Grupo Scout';
 
 @Injectable()
 export class PublicConfigService {
