@@ -20,6 +20,7 @@ import {
   renderHtmlToPdf,
   sanitizeHtmlForPdf,
 } from '../common/pdf/render-html-to-pdf';
+import { formatArgentinaDate } from '../common/utils/argentina-datetime.util';
 
 type CicloProgramaPdfEvent = {
   id: number;
@@ -660,9 +661,7 @@ export class CiclosProgramaService {
   }
 
   private formatDate(date: Date) {
-    return new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' }).format(
-      date,
-    );
+    return formatArgentinaDate(date);
   }
 
   private extractScopedRamaIds(user: AuthenticatedUser) {

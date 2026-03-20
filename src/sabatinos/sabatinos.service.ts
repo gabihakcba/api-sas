@@ -13,6 +13,10 @@ import { CreateSabatinoDto } from './dto/create-sabatino.dto';
 import { UpdateSabatinoDto } from './dto/update-sabatino.dto';
 import { UpdateSabatinoActividadesDto } from './dto/update-sabatino-actividades.dto';
 import { renderHtmlToPdf, escapeHtml } from '../common/pdf/render-html-to-pdf';
+import {
+  formatArgentinaDateTime,
+  formatArgentinaTime,
+} from '../common/utils/argentina-datetime.util';
 
 @Injectable()
 export class SabatinosService {
@@ -407,12 +411,7 @@ export class SabatinosService {
 
         return `
         <tr>
-          <td style="text-align: center;">${new Intl.DateTimeFormat('es-AR', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-            timeZone: 'America/Argentina/Buenos_Aires',
-          }).format(new Date(row.fecha))}</td>
+          <td style="text-align: center;">${formatArgentinaTime(new Date(row.fecha))}</td>
           <td style="text-align: center;">${row.numero || '-'}</td>
           <td><strong>${escapeHtml(act.nombre)}</strong></td>
           <td style="font-size: 9px;">${
@@ -452,12 +451,7 @@ export class SabatinosService {
             <span class="detail-number">${row.numero}</span>
             <span class="detail-title">${escapeHtml(act.nombre)}</span>
             <span class="detail-meta">
-              ${new Intl.DateTimeFormat('es-AR', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-                timeZone: 'America/Argentina/Buenos_Aires',
-              }).format(new Date(row.fecha))} | 
+              ${formatArgentinaTime(new Date(row.fecha))} | 
               ${escapeHtml(act.Tipo.nombre)} | 
               Resp: ${escapeHtml(responsables)}
             </span>
@@ -533,25 +527,9 @@ export class SabatinosService {
                 <span class="info-label">Lugar:</span> <span>${escapeHtml(groupName)}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">Fecha:</span> <span>${new Intl.DateTimeFormat(
-                  'es-AR',
-                  {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false,
-                    timeZone: 'America/Argentina/Buenos_Aires',
-                  },
-                ).format(
+                <span class="info-label">Fecha:</span> <span>${formatArgentinaDateTime(
                   new Date(sabatino.fecha_inicio),
-                )} - ${new Intl.DateTimeFormat('es-AR', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: false,
-                  timeZone: 'America/Argentina/Buenos_Aires',
-                }).format(new Date(sabatino.fecha_fin))}</span>
+                )} - ${formatArgentinaTime(new Date(sabatino.fecha_fin))}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Ramas:</span> <span>${escapeHtml(

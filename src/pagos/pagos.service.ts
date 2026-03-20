@@ -17,6 +17,9 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
+import {
+  formatArgentinaDateTime,
+} from '../common/utils/argentina-datetime.util';
 import { CreatePagoDto } from './dto/create-pago.dto';
 import { PagosQueryDto } from './dto/pagos-query.dto';
 
@@ -1234,7 +1237,11 @@ export class PagosService {
           top + 304,
         );
 
-      doc.text(`Generado el ${this.formatDate(new Date())}`, labelX, top + 322);
+      doc.text(
+        `Generado el ${this.formatDate(new Date())}`,
+        labelX,
+        top + 322,
+      );
 
       const signatureY = top + 318;
       const signatureX = left + width - 190;
@@ -1397,11 +1404,7 @@ export class PagosService {
   }
 
   private formatDate(value: Date) {
-    return new Intl.DateTimeFormat('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(value);
+    return formatArgentinaDateTime(value);
   }
 
   private formatCurrency(value: string | number | Prisma.Decimal) {

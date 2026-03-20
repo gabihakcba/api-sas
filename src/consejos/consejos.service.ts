@@ -23,6 +23,10 @@ import {
   renderHtmlToPdf,
   sanitizeHtmlForPdf,
 } from '../common/pdf/render-html-to-pdf';
+import {
+  formatArgentinaDate,
+  formatArgentinaTimeRange,
+} from '../common/utils/argentina-datetime.util';
 
 type AttendanceMember = {
   id: number;
@@ -1339,28 +1343,11 @@ export class ConsejosService {
   }
 
   private formatDate(value: Date) {
-    return new Intl.DateTimeFormat('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(value);
+    return formatArgentinaDate(value);
   }
 
   private formatTimeRange(start: Date | null, end: Date | null) {
-    if (!start && !end) {
-      return '-';
-    }
-
-    const formatter = new Intl.DateTimeFormat('es-AR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-
-    const startLabel = start ? formatter.format(start) : '--:--';
-    const endLabel = end ? formatter.format(end) : '--:--';
-
-    return `${startLabel} - ${endLabel}`;
+    return formatArgentinaTimeRange(start, end);
   }
 
   private formatEstado(value: ESTADO_TEMARIO) {
