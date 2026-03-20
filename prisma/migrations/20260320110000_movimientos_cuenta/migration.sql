@@ -10,7 +10,7 @@ CREATE TABLE "MovimientoCuenta" (
     "fecha_movimiento" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "saldo_anterior" DECIMAL(15,2) NOT NULL,
     "saldo_posterior" DECIMAL(15,2) NOT NULL,
-    "codigo_referencia" TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+    "codigo_referencia" TEXT NOT NULL,
     "borrado" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,

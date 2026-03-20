@@ -1,2 +1,1 @@
--- AlterTable
-ALTER TABLE "MovimientoCuenta" ALTER COLUMN "codigo_referencia" DROP DEFAULT;
+-- preserved to keep migration history aligned with applied database state
