@@ -11,8 +11,11 @@ import {
   Post,
   Query,
   Request,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CheckPermissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
@@ -63,6 +66,30 @@ export class ResponsablesController {
     @Request() req: AuthenticatedRequest,
   ) {
     return this.responsablesService.create(dto, req.user!);
+  }
+
+  @Post('import')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('CREATE:RESPONSABLE')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 10 * 1024 * 1024,
+      },
+    }),
+  )
+  async importSpreadsheet(
+    @UploadedFile()
+    file: {
+      originalname: string;
+      mimetype: string;
+      buffer: Buffer;
+      size: number;
+    },
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.responsablesService.importSpreadsheet(file, req.user!);
   }
 
   @Patch(':id')

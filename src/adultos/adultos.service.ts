@@ -9,6 +9,14 @@ import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import { hasSoftDeleteAuditAccess } from '../auth/utils/unrestricted-access.util';
 import { CuentasService } from '../cuentas/cuentas.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  getSpreadsheetBoolean,
+  getSpreadsheetDate,
+  getSpreadsheetRequiredString,
+  getSpreadsheetString,
+  ImportedSpreadsheetFile,
+  parseSpreadsheetImportFile,
+} from '../common/import/spreadsheet-import.util';
 import { AdultosQueryDto } from './dto/adultos-query.dto';
 import { CreateAdultoDto } from './dto/create-adulto.dto';
 import { UpdateAdultoFirmaDto } from './dto/update-adulto-firma.dto';
@@ -640,6 +648,123 @@ export class AdultosService {
     });
   }
 
+  async importSpreadsheet(
+    file: ImportedSpreadsheetFile,
+    user: AuthenticatedUser,
+    selectedRamaId?: number,
+  ) {
+    const rows = parseSpreadsheetImportFile(file);
+    const rama = await this.resolveAdultImportRama(user, selectedRamaId);
+    const ayudanteRole = await this.prisma.role.findFirst({
+      where: {
+        nombre: 'AYUDANTE_RAMA',
+      },
+      select: {
+        id: true,
+      },
+    });
+    const ayudantePosicion = await this.prisma.posicionArea.findFirst({
+      where: {
+        nombre: 'Ayudante',
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!ayudanteRole || !ayudantePosicion) {
+      throw new BadRequestException(
+        'No se encontró la configuración base para importar adultos de rama.',
+      );
+    }
+
+    const created: Array<{ rowNumber: number; nombre: string; id: number }> = [];
+    const errors: Array<{ rowNumber: number; identifier: string; message: string }> = [];
+
+    for (const row of rows) {
+      try {
+        const nombre = getSpreadsheetRequiredString(
+          row.values,
+          ['nombre'],
+          'nombre',
+        );
+        const apellidos = getSpreadsheetRequiredString(
+          row.values,
+          ['apellidos', 'apellido'],
+          'apellidos',
+        );
+        const dni = getSpreadsheetRequiredString(row.values, ['dni'], 'dni');
+
+        const createdAdulto = await this.create({
+          user: dni,
+          password: dni,
+          nombre,
+          apellidos,
+          dni,
+          fechaNacimiento: getSpreadsheetDate(
+            row.values,
+            ['fechaNacimiento', 'fecha_nacimiento', 'nacimiento'],
+          )!,
+          direccion: getSpreadsheetRequiredString(
+            row.values,
+            ['direccion', 'domicilio'],
+            'direccion',
+          ),
+          email: getSpreadsheetString(row.values, ['email', 'correo']),
+          telefono: getSpreadsheetString(row.values, ['telefono', 'tel']),
+          telefonoEmergencia: getSpreadsheetRequiredString(
+            row.values,
+            ['telefonoEmergencia', 'telefono_emergencia', 'emergencia'],
+            'telefonoEmergencia',
+          ),
+          totem: getSpreadsheetString(row.values, ['totem']),
+          cualidad: getSpreadsheetString(row.values, ['cualidad']),
+          idArea: rama.id_area,
+          idPosicion: ayudantePosicion.id,
+          idRama: rama.id,
+          fechaInicioEquipo: getSpreadsheetDate(row.values, [
+            'fechaInicioEquipo',
+            'fecha_inicio_equipo',
+            'ingresoEquipo',
+          ]),
+          esBecado: getSpreadsheetBoolean(row.values, [
+            'esBecado',
+            'es_becado',
+            'becado',
+          ]),
+          activo: getSpreadsheetBoolean(row.values, ['activo']),
+          idRole: ayudanteRole.id,
+          tipoScope: SCOPE.RAMA,
+          idScope: rama.id,
+        });
+
+        created.push({
+          rowNumber: row.rowNumber,
+          nombre: `${nombre} ${apellidos}`.trim(),
+          id: createdAdulto.adulto.id,
+        });
+      } catch (error) {
+        errors.push({
+          rowNumber: row.rowNumber,
+          identifier:
+            getSpreadsheetString(row.values, ['dni']) ??
+            getSpreadsheetString(row.values, ['user', 'usuario']) ??
+            '-',
+          message:
+            error instanceof Error ? error.message : 'No se pudo importar la fila.',
+        });
+      }
+    }
+
+    return {
+      totalRows: rows.length,
+      createdCount: created.length,
+      errorCount: errors.length,
+      created,
+      errors,
+    };
+  }
+
   private async getAdultScopeWhere(user: AuthenticatedUser) {
     const baseScopeWhere = this.scopeFilterService.forAdultos(user);
 
@@ -941,6 +1066,48 @@ export class AdultosService {
 
       return this.findOne(id, user);
     });
+  }
+
+  private async resolveAdultImportRama(
+    user: AuthenticatedUser,
+    selectedRamaId?: number,
+  ) {
+    const ramas = await this.prisma.rama.findMany({
+      where: this.scopeFilterService.mergeWhere(
+        {
+          borrado: false,
+        },
+        this.scopeFilterService.forRamas(user),
+      ),
+      select: {
+        id: true,
+        nombre: true,
+        id_area: true,
+      },
+      orderBy: {
+        nombre: 'asc',
+      },
+    });
+
+    if (selectedRamaId) {
+      const selectedRama = ramas.find((item) => item.id === selectedRamaId);
+
+      if (!selectedRama) {
+        throw new BadRequestException(
+          'La rama seleccionada no está disponible para tu scope.',
+        );
+      }
+
+      return selectedRama;
+    }
+
+    if (ramas.length === 1) {
+      return ramas[0];
+    }
+
+    throw new BadRequestException(
+      'Debes seleccionar una única rama para la importación.',
+    );
   }
 
   async remove(id: number, user: AuthenticatedUser) {

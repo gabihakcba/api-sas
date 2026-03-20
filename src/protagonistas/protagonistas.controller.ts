@@ -12,7 +12,10 @@ import {
   Request,
   Post,
   UseGuards,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { SCOPE } from '@prisma/client';
 import { CheckPermissions } from '../auth/decorators/permissions.decorator';
 import { ScopeAccess } from '../auth/decorators/scopes.decorator';
@@ -20,6 +23,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { ScopesGuard } from '../auth/guards/scopes.guard';
 import { AuthenticatedRequest } from '../auth/types/auth-request.types';
+import { ImportScopedSpreadsheetDto } from '../common/dto/import-scoped-spreadsheet.dto';
 import { CreateProtagonistaDto } from './dto/create-protagonista.dto';
 import { ProtagonistaPaseDto } from './dto/protagonista-pase.dto';
 import { ProtagonistasService } from './protagonistas.service';
@@ -60,6 +64,31 @@ export class ProtagonistasController {
   )
   async create(@Body() dto: CreateProtagonistaDto) {
     return this.protagonistasService.create(dto);
+  }
+
+  @Post('import')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('CREATE:MIEMBRO', 'CREATE:PROTAGONISTA')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 10 * 1024 * 1024,
+      },
+    }),
+  )
+  async importSpreadsheet(
+    @Body() dto: ImportScopedSpreadsheetDto,
+    @UploadedFile()
+    file: {
+      originalname: string;
+      mimetype: string;
+      buffer: Buffer;
+      size: number;
+    },
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.protagonistasService.importSpreadsheet(file, req.user!, dto.idRama);
   }
 
   @Patch(':id')

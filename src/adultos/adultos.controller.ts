@@ -11,8 +11,11 @@ import {
   Post,
   Query,
   Request,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { SCOPE } from '@prisma/client';
 import { CheckPermissions } from '../auth/decorators/permissions.decorator';
 import { ScopeAccess } from '../auth/decorators/scopes.decorator';
@@ -20,6 +23,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { ScopesGuard } from '../auth/guards/scopes.guard';
 import { AuthenticatedRequest } from '../auth/types/auth-request.types';
+import { ImportScopedSpreadsheetDto } from '../common/dto/import-scoped-spreadsheet.dto';
 import { AdultosService } from './adultos.service';
 import { AdultosQueryDto } from './dto/adultos-query.dto';
 import { CreateAdultoDto } from './dto/create-adulto.dto';
@@ -77,6 +81,31 @@ export class AdultosController {
   )
   async create(@Body() dto: CreateAdultoDto) {
     return this.adultosService.create(dto);
+  }
+
+  @Post('import')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('CREATE:MIEMBRO', 'CREATE:ADULTO')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 10 * 1024 * 1024,
+      },
+    }),
+  )
+  async importSpreadsheet(
+    @Body() dto: ImportScopedSpreadsheetDto,
+    @UploadedFile()
+    file: {
+      originalname: string;
+      mimetype: string;
+      buffer: Buffer;
+      size: number;
+    },
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.adultosService.importSpreadsheet(file, req.user!, dto.idRama);
   }
 
   @Patch(':id')

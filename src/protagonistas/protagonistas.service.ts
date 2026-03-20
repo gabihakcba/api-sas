@@ -1,10 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, SCOPE } from '@prisma/client';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import { hasSoftDeleteAuditAccess } from '../auth/utils/unrestricted-access.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { CuentasService } from '../cuentas/cuentas.service';
+import {
+  getSpreadsheetBoolean,
+  getSpreadsheetDate,
+  getSpreadsheetRequiredString,
+  getSpreadsheetString,
+  ImportedSpreadsheetFile,
+  parseSpreadsheetImportFile,
+} from '../common/import/spreadsheet-import.util';
 import { CreateProtagonistaDto } from './dto/create-protagonista.dto';
 import { ProtagonistaPaseDto } from './dto/protagonista-pase.dto';
 import { UpdateProtagonistaDto } from './dto/update-protagonista.dto';
@@ -366,6 +374,96 @@ export class ProtagonistasService {
     });
   }
 
+  async importSpreadsheet(
+    file: ImportedSpreadsheetFile,
+    user: AuthenticatedUser,
+    selectedRamaId?: number,
+  ) {
+    const rows = parseSpreadsheetImportFile(file);
+    const rama = await this.resolveImportRama(user, selectedRamaId);
+
+    const created: Array<{ rowNumber: number; nombre: string; id: number }> = [];
+    const errors: Array<{ rowNumber: number; identifier: string; message: string }> = [];
+
+    for (const row of rows) {
+      try {
+        const nombre = getSpreadsheetRequiredString(
+          row.values,
+          ['nombre'],
+          'nombre',
+        );
+        const apellidos = getSpreadsheetRequiredString(
+          row.values,
+          ['apellidos', 'apellido'],
+          'apellidos',
+        );
+        const dni = getSpreadsheetRequiredString(row.values, ['dni'], 'dni');
+
+        const result = await this.create({
+          user: dni,
+          password: dni,
+          nombre,
+          apellidos,
+          dni,
+          fechaNacimiento: getSpreadsheetDate(
+            row.values,
+            ['fechaNacimiento', 'fecha_nacimiento', 'nacimiento'],
+          )!,
+          direccion: getSpreadsheetRequiredString(
+            row.values,
+            ['direccion', 'domicilio'],
+            'direccion',
+          ),
+          email: getSpreadsheetString(row.values, ['email', 'correo']),
+          telefono: getSpreadsheetString(row.values, ['telefono', 'tel']),
+          telefonoEmergencia: getSpreadsheetRequiredString(
+            row.values,
+            ['telefonoEmergencia', 'telefono_emergencia', 'emergencia'],
+            'telefonoEmergencia',
+          ),
+          totem: getSpreadsheetString(row.values, ['totem']),
+          cualidad: getSpreadsheetString(row.values, ['cualidad']),
+          idRama: rama.id,
+          fechaIngresoRama: getSpreadsheetDate(row.values, [
+            'fechaIngresoRama',
+            'fecha_ingreso_rama',
+            'ingresoRama',
+          ]),
+          esBecado: getSpreadsheetBoolean(row.values, [
+            'esBecado',
+            'es_becado',
+            'becado',
+          ]),
+          activo: getSpreadsheetBoolean(row.values, ['activo']),
+        });
+
+        created.push({
+          rowNumber: row.rowNumber,
+          nombre: `${nombre} ${apellidos}`.trim(),
+          id: result.protagonista.id,
+        });
+      } catch (error) {
+        errors.push({
+          rowNumber: row.rowNumber,
+          identifier:
+            getSpreadsheetString(row.values, ['dni']) ??
+            getSpreadsheetString(row.values, ['user', 'usuario']) ??
+            '-',
+          message:
+            error instanceof Error ? error.message : 'No se pudo importar la fila.',
+        });
+      }
+    }
+
+    return {
+      totalRows: rows.length,
+      createdCount: created.length,
+      errorCount: errors.length,
+      created,
+      errors,
+    };
+  }
+
   async update(
     id: number,
     dto: UpdateProtagonistaDto,
@@ -462,6 +560,47 @@ export class ProtagonistasService {
 
       return this.findOne(id, user);
     });
+  }
+
+  private async resolveImportRama(
+    user: AuthenticatedUser,
+    selectedRamaId?: number,
+  ) {
+    const ramas = await this.prisma.rama.findMany({
+      where: this.scopeFilterService.mergeWhere(
+        {
+          borrado: false,
+        },
+        this.scopeFilterService.forRamas(user),
+      ),
+      select: {
+        id: true,
+        nombre: true,
+      },
+      orderBy: {
+        nombre: 'asc',
+      },
+    });
+
+    if (selectedRamaId) {
+      const selectedRama = ramas.find((item) => item.id === selectedRamaId);
+
+      if (!selectedRama) {
+        throw new BadRequestException(
+          'La rama seleccionada no está disponible para tu scope.',
+        );
+      }
+
+      return selectedRama;
+    }
+
+    if (ramas.length === 1) {
+      return ramas[0];
+    }
+
+    throw new BadRequestException(
+      'Debes seleccionar una única rama para la importación.',
+    );
   }
 
   async registerPase(

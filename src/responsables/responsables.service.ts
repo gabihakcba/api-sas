@@ -1,10 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, SCOPE } from '@prisma/client';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import { hasSoftDeleteAuditAccess } from '../auth/utils/unrestricted-access.util';
 import { CuentasService } from '../cuentas/cuentas.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  getSpreadsheetDate,
+  getSpreadsheetRequiredString,
+  getSpreadsheetString,
+  ImportedSpreadsheetFile,
+  parseSpreadsheetImportFile,
+} from '../common/import/spreadsheet-import.util';
 import { CreateResponsableDto } from './dto/create-responsable.dto';
 import { ResponsablesQueryDto } from './dto/responsables-query.dto';
 import { UpdateResponsabilidadesDto } from './dto/update-responsabilidades.dto';
@@ -219,6 +226,83 @@ export class ResponsablesService {
     });
 
     return this.findOneByMiembroId(created.miembroId, user);
+  }
+
+  async importSpreadsheet(
+    file: ImportedSpreadsheetFile,
+    user: AuthenticatedUser,
+  ) {
+    const rows = parseSpreadsheetImportFile(file);
+    const created: Array<{ rowNumber: number; nombre: string; id: number }> = [];
+    const errors: Array<{ rowNumber: number; identifier: string; message: string }> = [];
+
+    for (const row of rows) {
+      try {
+        const nombre = getSpreadsheetRequiredString(
+          row.values,
+          ['nombre'],
+          'nombre',
+        );
+        const apellidos = getSpreadsheetRequiredString(
+          row.values,
+          ['apellidos', 'apellido'],
+          'apellidos',
+        );
+        const dni = getSpreadsheetRequiredString(row.values, ['dni'], 'dni');
+        const createdResponsable = await this.create(
+          {
+            user: dni,
+            password: dni,
+            nombre,
+            apellidos,
+            dni,
+            fechaNacimiento: getSpreadsheetDate(
+              row.values,
+              ['fechaNacimiento', 'fecha_nacimiento', 'nacimiento'],
+            )!,
+            direccion: getSpreadsheetRequiredString(
+              row.values,
+              ['direccion', 'domicilio'],
+              'direccion',
+            ),
+            email: getSpreadsheetString(row.values, ['email', 'correo']),
+            telefono: getSpreadsheetString(row.values, ['telefono', 'tel']),
+            telefonoEmergencia: getSpreadsheetRequiredString(
+              row.values,
+              ['telefonoEmergencia', 'telefono_emergencia', 'emergencia'],
+              'telefonoEmergencia',
+            ),
+            totem: getSpreadsheetString(row.values, ['totem']),
+            cualidad: getSpreadsheetString(row.values, ['cualidad']),
+          },
+          user,
+        );
+
+        created.push({
+          rowNumber: row.rowNumber,
+          nombre: `${nombre} ${apellidos}`.trim(),
+          id: createdResponsable.id,
+        });
+      } catch (error) {
+        errors.push({
+          rowNumber: row.rowNumber,
+          identifier:
+            getSpreadsheetString(row.values, ['dni']) ??
+            getSpreadsheetString(row.values, ['user', 'usuario']) ??
+            '-',
+          message:
+            error instanceof Error ? error.message : 'No se pudo importar la fila.',
+        });
+      }
+    }
+
+    return {
+      totalRows: rows.length,
+      createdCount: created.length,
+      errorCount: errors.length,
+      created,
+      errors,
+    };
   }
 
   async update(id: number, dto: UpdateResponsableDto, user: AuthenticatedUser) {
