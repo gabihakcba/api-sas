@@ -134,15 +134,46 @@ export class ActividadesService {
   async update(id: number, dto: UpdateActividadDto) {
     await this.findOne(id);
 
-    return this.prisma.actividad.update({
-      where: { id },
-      data: {
-        nombre: dto.nombre,
-        descripcion: dto.descripcion,
-        objetivos: dto.objetivos,
-        materiales: dto.materiales,
-        id_tipo: dto.id_tipo,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Update basic activity data
+      const actividad = await tx.actividad.update({
+        where: { id },
+        data: {
+          nombre: dto.nombre,
+          descripcion: dto.descripcion,
+          objetivos: dto.objetivos,
+          materiales: dto.materiales,
+          id_tipo: dto.id_tipo,
+        },
+      });
+
+      // 2. Update relationship data if sabatino context is provided
+      if (dto.id_sabatino) {
+        // We update the ActividadSabatino record
+        // Since id_actividad and id_sabatino form the primary key, we use update
+        await tx.actividadSabatino.update({
+          where: {
+            id_actividad_id_sabatino: {
+              id_actividad: id,
+              id_sabatino: dto.id_sabatino,
+            },
+          },
+          data: {
+            fecha: dto.fecha ? new Date(dto.fecha) : undefined,
+            numero: dto.numero,
+            Responsables: dto.responsableIds
+              ? {
+                  deleteMany: {},
+                  create: dto.responsableIds.map((rid: number) => ({
+                    id_adulto: rid,
+                  })),
+                }
+              : undefined,
+          },
+        });
+      }
+
+      return actividad;
     });
   }
 
