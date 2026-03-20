@@ -44,8 +44,12 @@ export class SabatinosService {
         ...(query.fechaDesde || query.fechaHasta
           ? {
               fecha_inicio: {
-                ...(query.fechaDesde ? { gte: new Date(query.fechaDesde) } : {}),
-                ...(query.fechaHasta ? { lte: new Date(query.fechaHasta) } : {}),
+                ...(query.fechaDesde
+                  ? { gte: new Date(query.fechaDesde) }
+                  : {}),
+                ...(query.fechaHasta
+                  ? { lte: new Date(query.fechaHasta) }
+                  : {}),
               },
             }
           : {}),
@@ -108,7 +112,12 @@ export class SabatinosService {
             Adulto: {
               include: {
                 Miembro: {
-                  select: { id: true, nombre: true, apellidos: true, dni: true },
+                  select: {
+                    id: true,
+                    nombre: true,
+                    apellidos: true,
+                    dni: true,
+                  },
                 },
               },
             },
@@ -244,7 +253,9 @@ export class SabatinosService {
           fecha_fin: dto.fechaFin ? new Date(dto.fechaFin) : undefined,
           Educadores: dto.educadorIds
             ? {
-                create: dto.educadorIds.map((eid: number) => ({ id_adulto: eid })),
+                create: dto.educadorIds.map((eid: number) => ({
+                  id_adulto: eid,
+                })),
               }
             : undefined,
           RamasAfectadas: dto.ramaIds
@@ -278,7 +289,11 @@ export class SabatinosService {
     });
   }
 
-  async updateActividades(id: number, dto: UpdateSabatinoActividadesDto, user: AuthenticatedUser) {
+  async updateActividades(
+    id: number,
+    dto: UpdateSabatinoActividadesDto,
+    user: AuthenticatedUser,
+  ) {
     await this.findOne(id, user);
 
     return this.prisma.$transaction(async (tx) => {
@@ -512,7 +527,7 @@ export class SabatinosService {
       <body>
         <div class="container">
           <header>
-            <h1>Planificación Sabatina: ${escapeHtml(sabatino.titulo)}</h1>
+            <h1>Planificación Sabatino: ${escapeHtml(sabatino.titulo)}</h1>
             <div class="info-grid">
               <div class="info-item">
                 <span class="info-label">Lugar:</span> <span>${escapeHtml(groupName)}</span>
@@ -529,15 +544,14 @@ export class SabatinosService {
                     hour12: false,
                     timeZone: 'America/Argentina/Buenos_Aires',
                   },
-                ).format(new Date(sabatino.fecha_inicio))} - ${new Intl.DateTimeFormat(
-              'es-AR',
-              {
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: false,
-              timeZone: 'America/Argentina/Buenos_Aires',
-              },
-              ).format(new Date(sabatino.fecha_fin))}</span>
+                ).format(
+                  new Date(sabatino.fecha_inicio),
+                )} - ${new Intl.DateTimeFormat('es-AR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false,
+                  timeZone: 'America/Argentina/Buenos_Aires',
+                }).format(new Date(sabatino.fecha_fin))}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Ramas:</span> <span>${escapeHtml(
