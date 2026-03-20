@@ -1140,6 +1140,7 @@ export class ConsejosService {
             text-transform: uppercase;
             color: #0f172a;
             margin-bottom: 0.6rem;
+            page-break-after: avoid;
           }
           h3 { font-size: 13px; line-height: 1.25; }
           h4 {
@@ -1150,7 +1151,7 @@ export class ConsejosService {
             margin-bottom: 0.35rem;
           }
           p { white-space: pre-wrap; }
-          section { page-break-inside: avoid; }
+          section { page-break-inside: auto; }
           .document { display: flex; flex-direction: column; gap: 1.1rem; }
           .header {
             border-bottom: 1px solid #cbd5e1;
@@ -1191,10 +1192,16 @@ export class ConsejosService {
           .section-block {
             padding-top: 0.15rem;
           }
+          .section-block-title {
+            margin-bottom: 0.6rem;
+          }
           .temas {
             display: flex;
             flex-direction: column;
             gap: 0.9rem;
+          }
+          .temas > .tema:first-child {
+            page-break-before: avoid;
           }
           .tema {
             padding-bottom: 0.9rem;
@@ -1293,11 +1300,11 @@ export class ConsejosService {
           </div>
         </header>
         <section class="section-block">
-          <h2>Asistencias</h2>
+          <h2 class="section-block-title">Asistencias</h2>
           ${asistentesHtml}
         </section>
         <section class="section-block">
-          <h2>Temario</h2>
+          <h2 class="section-block-title">Temario</h2>
           <div class="temas">${temasHtml}</div>
         </section>
         </div>
