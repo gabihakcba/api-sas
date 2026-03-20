@@ -395,6 +395,7 @@ export class SabatinosService {
           <td style="text-align: center;">${new Intl.DateTimeFormat('es-AR', {
             hour: '2-digit',
             minute: '2-digit',
+            hour12: false,
             timeZone: 'America/Argentina/Buenos_Aires',
           }).format(new Date(row.fecha))}</td>
           <td style="text-align: center;">${row.numero || '-'}</td>
@@ -439,6 +440,7 @@ export class SabatinosService {
               ${new Intl.DateTimeFormat('es-AR', {
                 hour: '2-digit',
                 minute: '2-digit',
+                hour12: false,
                 timeZone: 'America/Argentina/Buenos_Aires',
               }).format(new Date(row.fecha))} | 
               ${escapeHtml(act.Tipo.nombre)} | 
@@ -516,7 +518,7 @@ export class SabatinosService {
                 <span class="info-label">Lugar:</span> <span>${escapeHtml(groupName)}</span>
               </div>
               <div class="info-item">
-                <span className="info-label">Fecha:</span> <span>${new Intl.DateTimeFormat(
+                <span class="info-label">Fecha:</span> <span>${new Intl.DateTimeFormat(
                   'es-AR',
                   {
                     day: '2-digit',
@@ -524,6 +526,7 @@ export class SabatinosService {
                     year: 'numeric',
                     hour: '2-digit',
                     minute: '2-digit',
+                    hour12: false,
                     timeZone: 'America/Argentina/Buenos_Aires',
                   },
                 ).format(new Date(sabatino.fecha_inicio))} - ${new Intl.DateTimeFormat(
@@ -531,6 +534,7 @@ export class SabatinosService {
               {
               hour: '2-digit',
               minute: '2-digit',
+              hour12: false,
               timeZone: 'America/Argentina/Buenos_Aires',
               },
               ).format(new Date(sabatino.fecha_fin))}</span>
