@@ -28,6 +28,8 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { RelacionesModule } from './relaciones/relaciones.module';
 import { ResponsablesModule } from './responsables/responsables.module';
 import { ReunionesModule } from './reuniones/reuniones.module';
+import { SabatinosModule } from './sabatinos/sabatinos.module';
+import { ActividadesModule } from './actividades/actividades.module';
 import { TiposEventoModule } from './tipos-evento/tipos-evento.module';
 
 @Module({
@@ -59,6 +61,8 @@ import { TiposEventoModule } from './tipos-evento/tipos-evento.module';
     RelacionesModule,
     ResponsablesModule,
     ReunionesModule,
+    SabatinosModule,
+    ActividadesModule,
     TiposEventoModule,
   ],
   controllers: [AppController],

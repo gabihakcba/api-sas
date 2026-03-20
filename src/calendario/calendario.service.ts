@@ -1,10 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { ScopeFilterService } from '../auth/services/scope-filter.service';
 
 @Injectable()
 export class CalendarioService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scopeFilterService: ScopeFilterService,
+  ) {}
 
   async getConsejos(fromValue: string, toValue: string) {
     const { from, to } = this.parseDateRange(fromValue, toValue);
@@ -208,6 +212,45 @@ export class CalendarioService {
         modalidad: true,
         lugar_fisico: true,
         url_virtual: true,
+      },
+    });
+  }
+
+  async getSabatinos(
+    user: AuthenticatedUser,
+    fromValue: string,
+    toValue: string,
+  ) {
+    const { from, to } = this.parseDateRange(fromValue, toValue);
+
+    const scopeWhere = this.scopeFilterService.forSabatinos(user);
+
+    return this.prisma.sabatino.findMany({
+      where: this.scopeFilterService.mergeWhere(
+        {
+          borrado: false,
+          fecha_inicio: {
+            lte: to,
+          },
+          fecha_fin: {
+            gte: from,
+          },
+        },
+        scopeWhere,
+      ),
+      orderBy: [{ fecha_inicio: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        titulo: true,
+        fecha_inicio: true,
+        fecha_fin: true,
+        RamasAfectadas: {
+          include: {
+            Rama: {
+              select: { nombre: true },
+            },
+          },
+        },
       },
     });
   }

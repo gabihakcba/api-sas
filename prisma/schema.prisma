@@ -118,6 +118,8 @@ model Adulto {
   PlanDesempenoComoAPF PlanDesempenoAdulto[]      @relation(name: "PlanDesempenoAdultoAPF")
   CompetenciaValidada  PlanDesempenoCompetencia[] @relation(name: "PlanDesempenoCompetenciaValidador")
   AsignacionesAPF      AsignacionAPF[]            @relation(name: "AsignacionAPFAdulto")
+  ActividadesSabatinoResponsable ActividadSabatinoResponsable[] @relation(name: "ActividadSabatinoResponsableAdulto")
+  SabatinosEducador      ActividadEducadorSabatino[]
 }
 
 model Responsable {
@@ -192,6 +194,7 @@ model Area {
   PlanFormacionTemplate PlanFormacionTemplate[] @relation(name: "PlanFormacionTemplateArea")
   Rama                  Rama[]                  @relation(name: "RamaArea")
   ReunionesAfectadas    AreaAfectadaReunion[]   @relation(name: "AreaAfectadaReunionArea")
+  SabatinosAfectados    AreaAfectadaSabatino[]
 }
 
 model EquipoArea {
@@ -242,6 +245,7 @@ model Rama {
   RamaAfectada       RamaAfectada[]        @relation(name: "RamaAfectadaRama")
   ReunionesAfectadas RamaAfectadaReunion[] @relation(name: "RamaAfectadaReunionRama")
   CicloPrograma      CicloPrograma[]       @relation(name: "CicloProgramaRama")
+  SabatinosAfectados RamaAfectadaSabatino[]
 }
 
 model PosicionArea {
@@ -1061,6 +1065,118 @@ enum RESOURCE {
   CONFIGURACION_GRUPO
   REUNION
   INVITADO_REUNION
+  SABATINO
+  PROGRAMA
+  ACTIVIDAD
+  TIPO_ACTIVIDAD
+}
+
+model TipoActividad {
+  id     Int     @id @default(autoincrement())
+  nombre String  @unique
+  color  String? @default("#FFFFFF")
+
+  // Relations
+  Actividades Actividad[] @relation(name: "TipoActividadActividad")
+}
+
+model Actividad {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+  objetivos   String?
+  materiales  String?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  id_tipo Int
+
+  // Foreign key relations
+  Tipo TipoActividad @relation(fields: [id_tipo], references: [id], name: "TipoActividadActividad")
+
+  // Relations
+  Sabatinos    ActividadSabatino[]    @relation(name: "ActividadSabatinoActividad")
+}
+
+model Sabatino {
+  id           Int      @id @default(autoincrement())
+  titulo       String
+  fecha_inicio DateTime
+  fecha_fin    DateTime
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  Educadores ActividadEducadorSabatino[] @relation(name: "SabatinoEducador")
+  Actividades ActividadSabatino[] @relation(name: "ActividadSabatinoSabatino")
+  RamasAfectadas RamaAfectadaSabatino[] @relation(name: "RamaAfectadaSabatinoSabatino")
+  AreasAfectadas AreaAfectadaSabatino[] @relation(name: "AreaAfectadaSabatinoSabatino")
+}
+
+model ActividadEducadorSabatino {
+  id_sabatino Int
+  id_adulto   Int
+
+  // Foreign key relations
+  Sabatino Sabatino @relation(fields: [id_sabatino], references: [id], name: "SabatinoEducador", onDelete: Cascade)
+  Adulto   Adulto   @relation(fields: [id_adulto], references: [id], onDelete: Cascade)
+
+  @@id([id_sabatino, id_adulto])
+}
+
+model ActividadSabatino {
+  id_actividad Int
+  id_sabatino  Int
+  numero       Int?
+  fecha        DateTime @default(now())
+
+  // Foreign key relations
+  Actividad Actividad @relation(fields: [id_actividad], references: [id], name: "ActividadSabatinoActividad", onDelete: Cascade)
+  Sabatino  Sabatino  @relation(fields: [id_sabatino], references: [id], name: "ActividadSabatinoSabatino", onDelete: Cascade)
+
+  // Relations
+  Responsables ActividadSabatinoResponsable[]
+
+  @@id([id_actividad, id_sabatino])
+}
+
+model ActividadSabatinoResponsable {
+  id_actividad Int
+  id_sabatino  Int
+  id_adulto    Int
+
+  // Foreign key relations
+  ActividadSabatino ActividadSabatino @relation(fields: [id_actividad, id_sabatino], references: [id_actividad, id_sabatino], onDelete: Cascade)
+  Adulto            Adulto            @relation(fields: [id_adulto], references: [id], name: "ActividadSabatinoResponsableAdulto", onDelete: Cascade)
+
+  @@id([id_actividad, id_sabatino, id_adulto])
+}
+
+model RamaAfectadaSabatino {
+  id_rama     Int
+  id_sabatino Int
+
+  // Foreign key relations
+  Rama     Rama     @relation(fields: [id_rama], references: [id], onDelete: Cascade)
+  Sabatino Sabatino @relation(fields: [id_sabatino], references: [id], name: "RamaAfectadaSabatinoSabatino", onDelete: Cascade)
+
+  @@id([id_rama, id_sabatino])
+}
+
+model AreaAfectadaSabatino {
+  id_area     Int
+  id_sabatino Int
+
+  // Foreign key relations
+  Area     Area     @relation(fields: [id_area], references: [id], onDelete: Cascade)
+  Sabatino Sabatino @relation(fields: [id_sabatino], references: [id], name: "AreaAfectadaSabatinoSabatino", onDelete: Cascade)
+
+  @@id([id_area, id_sabatino])
 }
 
 model Permission {

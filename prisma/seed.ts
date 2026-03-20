@@ -42,6 +42,10 @@ const SECRETARIA_TESORERIA_RESOURCES = [
   RESOURCE.TIPO_EVENTO,
   RESOURCE.REUNION,
   RESOURCE.INVITADO_REUNION,
+  RESOURCE.SABATINO,
+  RESOURCE.PROGRAMA,
+  RESOURCE.ACTIVIDAD,
+  RESOURCE.TIPO_ACTIVIDAD,
 ] as const;
 
 const ADULTO_READONLY_RESOURCES = [RESOURCE.ADULTO] as const;
@@ -66,6 +70,10 @@ const RAMA_FULL_ACCESS_RESOURCES = [
   RESOURCE.CICLO_PROGRAMA,
   RESOURCE.REUNION,
   RESOURCE.INVITADO_REUNION,
+  RESOURCE.SABATINO,
+  RESOURCE.PROGRAMA,
+  RESOURCE.ACTIVIDAD,
+  RESOURCE.TIPO_ACTIVIDAD,
 ] as const;
 
 const RAMA_READONLY_RESOURCES = [
@@ -230,6 +238,13 @@ const RELACION_DEFINITIONS = [
   { tipo: 'Abuela', descripcion: 'Responsable con vínculo de abuela.' },
   { tipo: 'Hermano', descripcion: 'Responsable con vínculo de hermano.' },
   { tipo: 'Hermana', descripcion: 'Responsable con vínculo de hermana.' },
+] as const;
+
+const TIPO_ACTIVIDAD_DEFINITIONS = [
+  { nombre: 'Dinamica', color: '#3B82F6' }, // Blue
+  { nombre: 'Grupal', color: '#10B981' }, // Green
+  { nombre: 'Juego', color: '#F59E0B' }, // Yellow/Orange
+  { nombre: 'Reflexiva', color: '#8B5CF6' }, // Purple
 ] as const;
 
 const PLAN_FORMACION_TEMPLATE_DEFINITIONS = [
@@ -1930,6 +1945,23 @@ async function seedCuentasDineroBase(
   }
 }
 
+async function seedTiposActividad(
+  tx: Prisma.TransactionClient,
+): Promise<void> {
+  console.log('Creando tipos de actividad base...');
+
+  for (const definition of TIPO_ACTIVIDAD_DEFINITIONS) {
+    await tx.tipoActividad.upsert({
+      where: { nombre: definition.nombre },
+      update: { color: definition.color },
+      create: {
+        nombre: definition.nombre,
+        color: definition.color,
+      },
+    });
+  }
+}
+
 async function seedAdminAccount(
   tx: Prisma.TransactionClient,
   roleIdByName: Map<string, number>,
@@ -2167,6 +2199,7 @@ async function main() {
     await seedRelaciones(tx);
     await seedPlanesFormacionTemplate(tx);
     await seedCuentasDineroBase(tx);
+    await seedTiposActividad(tx);
     await tx.configuracionGrupo.upsert({
       where: { id: 1 },
       update: {},

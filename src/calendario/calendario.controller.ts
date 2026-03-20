@@ -42,4 +42,17 @@ export class CalendarioController {
       query.to,
     );
   }
+
+  @Get('sabatinos')
+  @UseGuards(JwtAuthGuard)
+  async getSabatinos(
+    @Request() req: AuthenticatedRequest,
+    @Query() query: CalendarRangeQueryDto,
+  ) {
+    return this.calendarioService.getSabatinos(
+      req.user!,
+      query.from,
+      query.to,
+    );
+  }
 }

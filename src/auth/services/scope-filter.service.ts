@@ -79,6 +79,14 @@ export class ScopeFilterService {
     return this.toWhereInput(this.buildAreaFilters(user.scopes));
   }
 
+  forSabatinos(user: AuthenticatedUser): ScopedWhere<Prisma.SabatinoWhereInput> {
+    if (this.hasUnrestrictedAccess(user)) {
+      return {};
+    }
+
+    return this.toWhereInput(this.buildSabatinoFilters(user));
+  }
+
   forCuentasDinero(
     user: AuthenticatedUser,
   ): ScopedWhere<Prisma.CuentaDineroWhereInput> {
@@ -862,6 +870,40 @@ export class ScopeFilterService {
             some: {
               id: scope.scopeId,
               borrado: false,
+            },
+          },
+        });
+      }
+    }
+
+    return filters;
+  }
+
+  private buildSabatinoFilters(
+    user: AuthenticatedUser,
+  ): Prisma.SabatinoWhereInput[] {
+    const filters: Prisma.SabatinoWhereInput[] = [];
+
+    for (const scope of user.scopes) {
+      if (scope.scopeId == null) {
+        continue;
+      }
+
+      if (scope.scopeType === SCOPE.RAMA) {
+        filters.push({
+          RamasAfectadas: {
+            some: {
+              id_rama: scope.scopeId,
+            },
+          },
+        });
+      }
+
+      if (scope.scopeType === SCOPE.AREA) {
+        filters.push({
+          AreasAfectadas: {
+            some: {
+              id_area: scope.scopeId,
             },
           },
         });
