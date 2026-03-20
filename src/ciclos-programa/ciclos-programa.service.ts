@@ -484,13 +484,36 @@ export class CiclosProgramaService {
 
     const eventosHtml =
       ciclo.Evento.length > 0
-        ? `<ul>${ciclo.Evento.map(
-            (evento) => `<li>
-          <strong>${escapeHtml(evento.nombre)}</strong><br/>
-          <span>${escapeHtml(this.formatDate(evento.fecha_inicio))} – ${escapeHtml(this.formatDate(evento.fecha_fin))}</span><br/>
-          <span>Tipo: ${escapeHtml(evento.TipoEvento?.nombre ?? 'Sin tipo')} · Estado: ${evento.terminado ? 'Completado' : 'Pendiente'}</span>
-        </li>`,
-          ).join('')}</ul>`
+        ? `
+          <table class="event-table">
+            <thead>
+              <tr>
+                <th style="width: 34%;">Evento</th>
+                <th style="width: 22%;">Fecha</th>
+                <th style="width: 24%;">Tipo</th>
+                <th style="width: 20%;">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${ciclo.Evento.map(
+                (evento) => `
+                  <tr>
+                    <td>
+                      <strong>${escapeHtml(evento.nombre)}</strong>
+                    </td>
+                    <td>
+                      ${escapeHtml(this.formatDate(evento.fecha_inicio))}
+                      <br />
+                      <span class="cell-subtle">${escapeHtml(this.formatDate(evento.fecha_fin))}</span>
+                    </td>
+                    <td>${escapeHtml(evento.TipoEvento?.nombre ?? 'Sin tipo')}</td>
+                    <td>${evento.terminado ? 'Completado' : 'Pendiente'}</td>
+                  </tr>
+                `,
+              ).join('')}
+            </tbody>
+          </table>
+        `
         : '<p>No hay eventos asociados.</p>';
 
     return `
@@ -499,44 +522,138 @@ export class CiclosProgramaService {
       <head>
         <meta charset="UTF-8" />
         <style>
-          body { font-family: Arial, sans-serif; color: #1f2937; font-size: 12px; line-height: 1.5; }
-          h1 { font-size: 22px; margin: 0 0 4px 0; }
-          h2 { font-size: 16px; margin: 20px 0 8px 0; }
-          h3 { font-size: 14px; margin: 0 0 8px 0; }
-          p { margin: 0 0 8px 0; white-space: pre-wrap; }
-          .muted { color: #6b7280; }
-          .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; page-break-inside: avoid; }
-          .stage-section { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; page-break-inside: avoid; }
-          .rich-content { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; }
-          .rich-content ul, .rich-content ol { margin: 0 0 8px 20px; padding-left: 20px; }
-          .rich-content li { margin: 3px 0; }
-          .rich-content h1, .rich-content h2, .rich-content h3 { margin: 8px 0 4px; }
-          .rich-content p { margin: 0 0 8px 0; }
-          ul { margin: 0; padding-left: 20px; }
-          li { margin-bottom: 8px; }
+          body {
+            font-family: Arial, sans-serif;
+            color: #1f2937;
+            font-size: 11px;
+            line-height: 1.45;
+            margin: 0;
+          }
+          h1, h2, h3, p, table { margin: 0; }
+          h1 { font-size: 21px; margin-bottom: 0.35rem; }
+          h2 {
+            font-size: 13px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #0f172a;
+            margin-bottom: 0.7rem;
+          }
+          h3 { font-size: 13px; margin-bottom: 0.45rem; }
+          p { white-space: pre-wrap; }
+          .document { display: flex; flex-direction: column; gap: 1.1rem; }
+          .header {
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 0.8rem;
+          }
+          .muted { color: #64748b; }
+          .header-description {
+            margin-top: 0.55rem;
+            color: #334155;
+          }
+          .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.35rem 1rem;
+            margin-top: 0.65rem;
+          }
+          .meta-item {
+            display: flex;
+            gap: 0.35rem;
+            align-items: baseline;
+          }
+          .meta-label {
+            color: #64748b;
+            min-width: 4.8rem;
+          }
+          .stage-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+          }
+          .stage-section {
+            padding-bottom: 0.85rem;
+            border-bottom: 1px solid #e2e8f0;
+            page-break-inside: avoid;
+          }
+          .stage-section:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+          }
+          .rich-content ul, .rich-content ol {
+            margin: 0.2rem 0 0.45rem 1rem;
+            padding-left: 0.8rem;
+          }
+          .rich-content li { margin: 0.18rem 0; }
+          .rich-content h1, .rich-content h2, .rich-content h3 {
+            margin: 0.45rem 0 0.2rem;
+            font-size: 12px;
+          }
+          .rich-content p { margin: 0 0 0.42rem 0; }
+          .event-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+          }
+          .event-table th,
+          .event-table td {
+            border: 1px solid #cbd5e1;
+            padding: 0.42rem 0.5rem;
+            vertical-align: top;
+            text-align: left;
+          }
+          .event-table th {
+            background: #f8fafc;
+            font-size: 10.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #334155;
+          }
+          .cell-subtle {
+            color: #64748b;
+            font-size: 10px;
+          }
+          .empty {
+            color: #64748b;
+            font-style: italic;
+          }
         </style>
       </head>
       <body>
-        <header class="card">
+        <div class="document">
+        <header class="header">
           <h1>${escapeHtml(ciclo.nombre)}</h1>
           <p class="muted">${escapeHtml(branding.nombre_grupo)}</p>
-          <p>
-            <strong>Rama:</strong> ${escapeHtml(ciclo.Rama.nombre)} ·
-            <strong>Estado:</strong> ${escapeHtml(ciclo.estado)}
-          </p>
-          <p>
-            <strong>Período:</strong> ${escapeHtml(this.formatDate(ciclo.fecha_inicio))} – ${escapeHtml(this.formatDate(ciclo.fecha_fin))}
-          </p>
-          <p>${escapeHtml(ciclo.descripcion ?? 'Sin descripción cargada.')}</p>
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">Rama</span>
+              <span>${escapeHtml(ciclo.Rama.nombre)}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Estado</span>
+              <span>${escapeHtml(ciclo.estado)}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Inicio</span>
+              <span>${escapeHtml(this.formatDate(ciclo.fecha_inicio))}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Fin</span>
+              <span>${escapeHtml(this.formatDate(ciclo.fecha_fin))}</span>
+            </div>
+          </div>
+          <p class="header-description">${escapeHtml(
+            ciclo.descripcion ?? 'Sin descripción cargada.',
+          )}</p>
         </header>
         <section>
           <h2>Bitácora del ciclo</h2>
-          ${stageSections || '<p>No hay contenido de bitácora cargado.</p>'}
+          <div class="stage-list">${stageSections || '<p class="empty">No hay contenido de bitácora cargado.</p>'}</div>
         </section>
-        <section class="card">
+        <section>
           <h2>Eventos vinculados</h2>
           ${eventosHtml}
         </section>
+        </div>
       </body>
       </html>
     `;

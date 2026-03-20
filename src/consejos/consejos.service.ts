@@ -1081,20 +1081,29 @@ export class ConsejosService {
 
             return `
               <section class="tema">
-                <h3>${escapeHtml(tema.titulo)}</h3>
-                <p class="meta">
-                  Estado: ${escapeHtml(this.formatEstado(tema.estado))}
-                  · Visibilidad: ${tema.sin_mp ? 'Solo educadores' : 'Publico'}
-                </p>
-                ${
-                  descripcion
-                    ? `<p><strong>Descripcion:</strong> ${escapeHtml(descripcion)}</p>`
-                    : '<p><strong>Descripcion:</strong> Sin descripcion.</p>'
-                }
-                <h4>Debate</h4>
-                <div class="rich-content">${debate || '<p>Sin contenido.</p>'}</div>
-                <h4>Acuerdo</h4>
-                <div class="rich-content">${acuerdo || '<p>Sin contenido.</p>'}</div>
+                <div class="tema-head">
+                  <div>
+                    <h3>${escapeHtml(tema.titulo)}</h3>
+                    ${
+                      descripcion
+                        ? `<p class="tema-description">${escapeHtml(descripcion)}</p>`
+                        : ''
+                    }
+                  </div>
+                  <div class="tema-badges">
+                    <span class="badge">${escapeHtml(this.formatEstado(tema.estado))}</span>
+                  </div>
+                </div>
+                <div class="tema-sections">
+                  <div class="tema-section">
+                    <h4>Debate</h4>
+                    <div class="rich-content">${debate || '<p>Sin contenido.</p>'}</div>
+                  </div>
+                  <div class="tema-section">
+                    <h4>Acuerdo</h4>
+                    <div class="rich-content">${acuerdo || '<p>Sin contenido.</p>'}</div>
+                  </div>
+                </div>
               </section>
             `;
           }).join('')
@@ -1116,51 +1125,182 @@ export class ConsejosService {
       <head>
         <meta charset="UTF-8" />
         <style>
-          body { font-family: Arial, sans-serif; color: #1f2937; font-size: 12px; line-height: 1.5; }
-          h1 { font-size: 22px; margin: 0 0 4px 0; }
-          h2 { font-size: 16px; margin: 20px 0 8px 0; }
-          h3 { font-size: 14px; margin: 0; }
-          h4 { font-size: 13px; margin: 12px 0 6px; }
-          p { margin: 0 0 8px 0; white-space: pre-wrap; }
-          .muted { color: #6b7280; }
-          .meta { color: #4b5563; margin-top: 4px; }
-          .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 14px; page-break-inside: avoid; }
-          .rich-content { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; }
-          .rich-content ul, .rich-content ol { margin: 0 0 8px 20px; padding-left: 20px; }
-          .rich-content li { margin: 3px 0; }
-          .rich-content h1, .rich-content h2, .rich-content h3 { margin: 8px 0 4px; }
-          .rich-content p { margin: 0 0 8px 0; }
-          .tema { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; page-break-inside: avoid; }
+          body {
+            font-family: Arial, sans-serif;
+            color: #1f2937;
+            font-size: 11px;
+            line-height: 1.45;
+            margin: 0;
+          }
+          h1, h2, h3, h4, p, ol, ul { margin: 0; }
+          h1 { font-size: 21px; line-height: 1.15; margin-bottom: 0.35rem; }
+          h2 {
+            font-size: 13px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #0f172a;
+            margin-bottom: 0.6rem;
+          }
+          h3 { font-size: 13px; line-height: 1.25; }
+          h4 {
+            font-size: 10.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #475569;
+            margin-bottom: 0.35rem;
+          }
+          p { white-space: pre-wrap; }
+          section { page-break-inside: avoid; }
+          .document { display: flex; flex-direction: column; gap: 1.1rem; }
+          .header {
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 0.8rem;
+          }
+          .header-summary {
+            color: #475569;
+            margin-bottom: 0.55rem;
+          }
+          .header-description {
+            margin-bottom: 0.65rem;
+            color: #334155;
+          }
+          .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.35rem 1rem;
+          }
+          .meta-item {
+            display: flex;
+            gap: 0.35rem;
+            align-items: baseline;
+          }
+          .meta-label {
+            color: #64748b;
+            min-width: 6rem;
+          }
+          .compact-list {
+            margin: 0;
+            padding-left: 1.1rem;
+            columns: 2;
+            column-gap: 1.25rem;
+          }
+          .compact-list li {
+            margin-bottom: 0.3rem;
+            break-inside: avoid;
+          }
+          .section-block {
+            padding-top: 0.15rem;
+          }
+          .temas {
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+          }
+          .tema {
+            padding-bottom: 0.9rem;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .tema:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+          }
+          .tema-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            align-items: flex-start;
+            margin-bottom: 0.55rem;
+          }
+          .tema-description {
+            margin-top: 0.3rem;
+            color: #475569;
+          }
+          .tema-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            justify-content: flex-end;
+          }
+          .badge {
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            padding: 0.14rem 0.45rem;
+            font-size: 10px;
+            color: #0f172a;
+            white-space: nowrap;
+          }
+          .badge-subtle {
+            color: #475569;
+          }
+          .tema-sections {
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+          }
+          .tema-section + .tema-section {
+            padding-top: 0.45rem;
+            border-top: 1px dashed #e2e8f0;
+          }
+          .rich-content {
+            color: #1f2937;
+          }
+          .rich-content ul, .rich-content ol {
+            margin: 0.2rem 0 0.45rem 1rem;
+            padding-left: 0.8rem;
+          }
+          .rich-content li { margin: 0.18rem 0; }
+          .rich-content h1, .rich-content h2, .rich-content h3 {
+            margin: 0.45rem 0 0.2rem;
+            font-size: 12px;
+          }
+          .rich-content p { margin: 0 0 0.42rem 0; }
+          .empty {
+            color: #64748b;
+            font-style: italic;
+          }
         </style>
       </head>
       <body>
-        <header>
+        <div class="document">
+        <header class="header">
           <h1>${escapeHtml(consejo.nombre)}</h1>
-          <p class="muted">
+          <p class="header-summary">
             Fecha: ${escapeHtml(this.formatDate(consejo.fecha))}
             · Tipo: ${consejo.es_ordinario ? 'Ordinario' : 'Extraordinario'}
-            · PDF: ${includePrivateTopics ? 'Completo' : 'Publico'}
           </p>
-          <p>${escapeHtml(consejo.descripcion ?? 'Sin descripcion cargada.')}</p>
-          <p>
-            <strong>Horario:</strong> ${escapeHtml(
-              this.formatTimeRange(consejo.hora_inicio, consejo.hora_fin),
-            )}
-          </p>
-          <p>
-            <strong>Moderador:</strong> ${escapeHtml(moderador)} ·
-            <strong>Secretario:</strong> ${escapeHtml(secretario)} ·
-            <strong>Prosecretario:</strong> ${escapeHtml(prosecretario)}
-          </p>
+          <p class="header-description">${escapeHtml(
+            consejo.descripcion ?? 'Sin descripcion cargada.',
+          )}</p>
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">Horario</span>
+              <span>${escapeHtml(
+                this.formatTimeRange(consejo.hora_inicio, consejo.hora_fin),
+              )}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Moderador</span>
+              <span>${escapeHtml(moderador)}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Secretario</span>
+              <span>${escapeHtml(secretario)}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Prosecretario</span>
+              <span>${escapeHtml(prosecretario)}</span>
+            </div>
+          </div>
         </header>
-        <section class="card">
+        <section class="section-block">
           <h2>Asistencias</h2>
           ${asistentesHtml}
         </section>
-        <section>
+        <section class="section-block">
           <h2>Temario</h2>
-          ${temasHtml}
+          <div class="temas">${temasHtml}</div>
         </section>
+        </div>
       </body>
       </html>
     `;
