@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateActividadDto } from './dto/create-actividad.dto';
 import { UpdateActividadDto } from './dto/update-actividad.dto';
 import { ActividadesQueryDto } from './dto/actividades-query.dto';
+import { BadRequestException } from '@nestjs/common';
 
 @Injectable()
 export class ActividadesService {
@@ -159,6 +160,42 @@ export class ActividadesService {
   async getTipos() {
     return this.prisma.tipoActividad.findMany({
       orderBy: { nombre: 'asc' },
+    });
+  }
+
+  async findAllTipos() {
+    return this.prisma.tipoActividad.findMany({
+      orderBy: { nombre: 'asc' },
+    });
+  }
+
+  async createTipo(dto: { nombre: string; color?: string }) {
+    return this.prisma.tipoActividad.create({
+      data: dto,
+    });
+  }
+
+  async updateTipo(id: number, dto: { nombre?: string; color?: string }) {
+    return this.prisma.tipoActividad.update({
+      where: { id },
+      data: dto,
+    });
+  }
+
+  async removeTipo(id: number) {
+    // Check if there are activities using this type
+    const count = await this.prisma.actividad.count({
+      where: { id_tipo: id, borrado: false },
+    });
+
+    if (count > 0) {
+      throw new BadRequestException(
+        'No se puede eliminar el tipo porque tiene actividades asociadas.',
+      );
+    }
+
+    return this.prisma.tipoActividad.delete({
+      where: { id },
     });
   }
 }

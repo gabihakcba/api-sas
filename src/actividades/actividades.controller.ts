@@ -35,7 +35,29 @@ export class ActividadesController {
   @Get('tipos')
   @CheckPermissions(`${ACTION.READ}:${RESOURCE.TIPO_ACTIVIDAD}`)
   async getTipos() {
-    return this.actividadesService.getTipos();
+    return this.actividadesService.findAllTipos();
+  }
+
+  @Post('tipos')
+  @CheckPermissions(`${ACTION.CREATE}:${RESOURCE.TIPO_ACTIVIDAD}`)
+  async createTipo(@Body() dto: { nombre: string; color?: string }) {
+    return this.actividadesService.createTipo(dto);
+  }
+
+  @Patch('tipos/:id')
+  @CheckPermissions(`${ACTION.UPDATE}:${RESOURCE.TIPO_ACTIVIDAD}`)
+  async updateTipo(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: { nombre?: string; color?: string },
+  ) {
+    return this.actividadesService.updateTipo(id, dto);
+  }
+
+  @Delete('tipos/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @CheckPermissions(`${ACTION.DELETE}:${RESOURCE.TIPO_ACTIVIDAD}`)
+  async removeTipo(@Param('id', ParseIntPipe) id: number) {
+    await this.actividadesService.removeTipo(id);
   }
 
   @Get(':id')
