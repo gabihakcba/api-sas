@@ -167,7 +167,8 @@ export class ConsejoRealtimeGateway
       client.data.user?.memberId ?? null,
       body,
     );
-    this.server
+    // Evita que el emisor reciba su propio eco y se sobreescriba mientras escribe.
+    client.broadcast
       .to(this.roomName(consejoId))
       .emit('consejo:temario:updated', updatedTemario);
   }
