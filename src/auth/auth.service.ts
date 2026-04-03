@@ -32,6 +32,17 @@ const ADULT_MEMBER_ROLES = new Set([
 const ADULT_READ_ONLY_ROLES = new Set(['SECRETARIA_TESORERIA', 'INTENDENCIA']);
 
 const ADMIN_BYPASS_ROLES = new Set(['ADM', 'OWN', 'DEV']);
+const BRANCH_LEADERSHIP_ROLES = new Set(['JEFATURA_RAMA', 'AYUDANTE_RAMA']);
+const BRANCH_CORE_MANAGEMENT_RESOURCES = [
+  RESOURCE.MIEMBRO,
+  RESOURCE.PROTAGONISTA,
+] as const;
+const CRUD_ACTIONS = [
+  ACTION.CREATE,
+  ACTION.READ,
+  ACTION.UPDATE,
+  ACTION.DELETE,
+] as const;
 @Injectable()
 export class AuthService {
   constructor(
@@ -151,6 +162,7 @@ export class AuthService {
       });
     });
 
+    this.normalizeBranchLeadershipPermissions(scopes, permissionsSet);
     this.normalizeAdultReadPermissions(roles, scopes, permissionsSet);
     this.normalizeMemberCajaPermissions(account.Miembro, permissionsSet, roles);
 
@@ -203,6 +215,28 @@ export class AuthService {
     permissionsSet.delete(`${ACTION.DELETE}:${RESOURCE.ADULTO}`);
     permissionsSet.delete(`${ACTION.MANAGE}:${RESOURCE.ADULTO}`);
     permissionsSet.add(`${ACTION.READ}:${RESOURCE.ADULTO}`);
+  }
+
+  private normalizeBranchLeadershipPermissions(
+    scopes: RoleScope[],
+    permissionsSet: Set<string>,
+  ): void {
+    const hasBranchLeadershipScope = scopes.some(
+      (scope) =>
+        BRANCH_LEADERSHIP_ROLES.has(scope.role) &&
+        scope.scopeType === SCOPE.RAMA &&
+        scope.scopeId != null,
+    );
+
+    if (!hasBranchLeadershipScope) {
+      return;
+    }
+
+    for (const resource of BRANCH_CORE_MANAGEMENT_RESOURCES) {
+      for (const action of CRUD_ACTIONS) {
+        permissionsSet.add(`${action}:${resource}`);
+      }
+    }
   }
 
   private normalizeMemberCajaPermissions(
