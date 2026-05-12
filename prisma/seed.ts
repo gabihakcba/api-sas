@@ -1098,6 +1098,17 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
     ],
   },
   {
+    nombre: 'REPRESENTANTE_JUVENIL',
+    descripcion:
+      'Acceso de lectura al modulo de consejos con restricciones sobre temas privados y exportaciones publicas.',
+    permissions: [
+      {
+        actions: [ACTION.READ],
+        resources: [RESOURCE.CONSEJO],
+      },
+    ],
+  },
+  {
     nombre: 'JEFATURA',
     descripcion:
       'Acceso total a las herramientas del sistema con capacidad de realizar modificaciones.',

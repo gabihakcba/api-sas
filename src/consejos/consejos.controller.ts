@@ -29,6 +29,7 @@ import { ConsejoAsistenciaOptionsQueryDto } from './dto/consejo-asistencia-optio
 import { CreateAsistenciaConsejoDto } from './dto/create-asistencia-consejo.dto';
 import { UpdateConsejoModeradorDto } from './dto/update-consejo-moderador.dto';
 import { UpdateConsejoSecretariaDto } from './dto/update-consejo-secretaria.dto';
+import { ManageRepresentanteJuvenilDto } from './dto/manage-representante-juvenil.dto';
 
 @Controller('consejos')
 export class ConsejosController {
@@ -113,6 +114,42 @@ export class ConsejosController {
       `attachment; filename="${file.filename}"`,
     );
     res.send(file.buffer);
+  }
+
+  @Get('meta/representantes-juveniles')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('UPDATE:CONSEJO')
+  async listRepresentantesJuveniles() {
+    return this.consejosService.listRepresentantesJuveniles();
+  }
+
+  @Get('meta/representantes-juveniles/options')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('UPDATE:CONSEJO')
+  async getRepresentantesJuvenilesOptions(
+    @Query('q') query?: string,
+  ) {
+    return this.consejosService.getRepresentantesJuvenilesOptions(query);
+  }
+
+  @Post('meta/representantes-juveniles')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('UPDATE:CONSEJO')
+  async assignRepresentanteJuvenil(
+    @Body() dto: ManageRepresentanteJuvenilDto,
+  ) {
+    return this.consejosService.assignRepresentanteJuvenil(dto.idMiembro);
+  }
+
+  @Delete('meta/representantes-juveniles/:memberId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('UPDATE:CONSEJO')
+  async removeRepresentanteJuvenil(
+    @Param('memberId', ParseIntPipe) memberId: number,
+  ) {
+    await this.consejosService.removeRepresentanteJuvenil(memberId);
   }
 
   @Post()
