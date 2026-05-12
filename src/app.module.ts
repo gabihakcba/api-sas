@@ -15,6 +15,7 @@ import { ConceptosPagoModule } from './conceptos-pago/conceptos-pago.module';
 import { CuentasModule } from './cuentas/cuentas.module';
 import { CuentasDineroModule } from './cuentas-dinero/cuentas-dinero.module';
 import { EventosModule } from './eventos/eventos.module';
+import { EventosVentaModule } from './eventos-venta/eventos-venta.module';
 import { MetodosPagoModule } from './metodos-pago/metodos-pago.module';
 import { LogsModule } from './logs/logs.module';
 import { PagosModule } from './pagos/pagos.module';
@@ -48,6 +49,7 @@ import { TiposEventoModule } from './tipos-evento/tipos-evento.module';
     CuentasModule,
     CuentasDineroModule,
     EventosModule,
+    EventosVentaModule,
     LogsModule,
     MetodosPagoModule,
     PagosModule,

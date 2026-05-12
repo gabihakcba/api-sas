@@ -77,6 +77,7 @@ model Miembro {
   ConsejoSecretariado   Consejo[]               @relation(name: "ConsejoSecretario")
   ConsejoProsecretaria  Consejo[]               @relation(name: "ConsejoProsecretario")
   InvitadoReunion       InvitadoReunion[]       @relation(name: "MiembroInvitadoReunion")
+  EventoVentaReserva   EventoVentaReserva[]    @relation(name: "EventoVentaReservaVendedor")
 }
 
 model Protagonista {
@@ -196,6 +197,7 @@ model Area {
   Rama                  Rama[]                  @relation(name: "RamaArea")
   ReunionesAfectadas    AreaAfectadaReunion[]   @relation(name: "AreaAfectadaReunionArea")
   SabatinosAfectados    AreaAfectadaSabatino[]
+  EventoVentaSector     EventoVentaSector[]     @relation(name: "EventoVentaSectorArea")
 }
 
 model EquipoArea {
@@ -247,6 +249,7 @@ model Rama {
   ReunionesAfectadas RamaAfectadaReunion[] @relation(name: "RamaAfectadaReunionRama")
   CicloPrograma      CicloPrograma[]       @relation(name: "CicloProgramaRama")
   SabatinosAfectados RamaAfectadaSabatino[]
+  EventoVentaSector  EventoVentaSector[]   @relation(name: "EventoVentaSectorRama")
 }
 
 model PosicionArea {
@@ -441,6 +444,213 @@ model InscripcionEvento {
   // Foreign key relations
   Evento  Evento  @relation(fields: [id_evento], references: [id], name: "InscripcionEventoEvento")
   Miembro Miembro @relation(fields: [id_miembro], references: [id], name: "InscripcionEventoMiembro")
+}
+
+enum TIPO_EVENTO_VENTA_HOJA {
+  BALANCE
+  GENERAL
+  SECTOR
+  OTRA
+}
+
+enum TIPO_EVENTO_VENTA_SECTOR {
+  RAMA
+  AREA
+  EXTRAS
+  OTRO
+}
+
+enum TIPO_EVENTO_VENTA_PAGO {
+  EFECTIVO
+  TRANSFERENCIA
+  OTRO
+}
+
+model EventoVenta {
+  id                Int      @id @default(autoincrement())
+  nombre            String
+  descripcion       String?
+  fecha_evento      DateTime
+  notas             String?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Items         EventoVentaItem[]         @relation(name: "EventoVentaItemEventoVenta")
+  Costos        EventoVentaCostoItem[]    @relation(name: "EventoVentaCostoEventoVenta")
+  Sectores      EventoVentaSector[]       @relation(name: "EventoVentaSectorEventoVenta")
+  Reservas      EventoVentaReserva[]      @relation(name: "EventoVentaReservaEventoVenta")
+  HojasImportes EventoVentaHojaImportada[] @relation(name: "EventoVentaHojaImportadaEventoVenta")
+}
+
+model EventoVentaCostoItem {
+  id                       Int      @id @default(autoincrement())
+  nombre                   String
+  descripcion              String?
+  unidad_medida            String?
+  costo_unitario_x10000    Int
+  cantidad_x10000          Int
+  orden                    Int      @default(0)
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  id_evento_venta Int
+
+  EventoVenta EventoVenta @relation(fields: [id_evento_venta], references: [id], name: "EventoVentaCostoEventoVenta")
+
+  @@index([id_evento_venta, borrado])
+}
+
+model EventoVentaItem {
+  id             Int      @id @default(autoincrement())
+  nombre         String
+  descripcion    String?
+  precio_unitario Decimal @db.Decimal(15, 2)
+  activo         Boolean  @default(true)
+  orden          Int      @default(0)
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  id_evento_venta Int
+
+  EventoVenta EventoVenta @relation(fields: [id_evento_venta], references: [id], name: "EventoVentaItemEventoVenta")
+  Ofertas     EventoVentaItemOferta[] @relation(name: "EventoVentaItemOfertaItem")
+  ReservaItems EventoVentaReservaItem[] @relation(name: "EventoVentaReservaItemItem")
+
+  @@index([id_evento_venta, borrado])
+}
+
+model EventoVentaItemOferta {
+  id           Int      @id @default(autoincrement())
+  cantidad     Int
+  precio_total Decimal  @db.Decimal(15, 2)
+  descripcion  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  id_evento_venta_item Int
+
+  Item EventoVentaItem @relation(fields: [id_evento_venta_item], references: [id], name: "EventoVentaItemOfertaItem")
+}
+
+model EventoVentaSector {
+  id                          Int                      @id @default(autoincrement())
+  nombre                      String
+  tipo_sector                 TIPO_EVENTO_VENTA_SECTOR @default(OTRO)
+  orden                       Int                      @default(0)
+  nombre_hoja                 String?
+  resumen_total_vendido       Int?
+  resumen_total_retirado      Int?
+  monto_rendido_efectivo      Decimal?                 @db.Decimal(15, 2)
+  monto_rendido_transferencia Decimal?                 @db.Decimal(15, 2)
+  monto_deuda_informado       Decimal?                 @db.Decimal(15, 2)
+  notas                       String?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  id_evento_venta Int
+  id_rama         Int?
+  id_area         Int?
+
+  EventoVenta EventoVenta @relation(fields: [id_evento_venta], references: [id], name: "EventoVentaSectorEventoVenta")
+  Rama        Rama?       @relation(fields: [id_rama], references: [id], name: "EventoVentaSectorRama")
+  Area        Area?       @relation(fields: [id_area], references: [id], name: "EventoVentaSectorArea")
+  Reservas    EventoVentaReserva[] @relation(name: "EventoVentaReservaSector")
+
+  @@index([id_evento_venta, borrado])
+}
+
+model EventoVentaReserva {
+  id                 Int      @id @default(autoincrement())
+  comprador_nombre   String
+  vendedor_nombre    String?
+  cantidad_total     Int      @default(0)
+  cantidad_retirada  Int      @default(0)
+  monto_total        Decimal  @default(0) @db.Decimal(15, 2)
+  monto_pagado       Decimal  @default(0) @db.Decimal(15, 2)
+  saldo_pendiente    Decimal  @default(0) @db.Decimal(15, 2)
+  cuenta_destino     String?
+  observaciones      String?
+  fila_origen        Int?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  id_evento_venta     Int
+  id_evento_venta_sector Int?
+  id_vendedor_miembro Int?
+
+  EventoVenta EventoVenta @relation(fields: [id_evento_venta], references: [id], name: "EventoVentaReservaEventoVenta")
+  Sector      EventoVentaSector? @relation(fields: [id_evento_venta_sector], references: [id], name: "EventoVentaReservaSector")
+  Vendedor    Miembro?    @relation(fields: [id_vendedor_miembro], references: [id], name: "EventoVentaReservaVendedor")
+  Items       EventoVentaReservaItem[] @relation(name: "EventoVentaReservaItemReserva")
+  Pagos       EventoVentaPago[] @relation(name: "EventoVentaPagoReserva")
+
+  @@index([id_evento_venta, borrado])
+  @@index([id_evento_venta_sector, borrado])
+}
+
+model EventoVentaReservaItem {
+  id             Int      @id @default(autoincrement())
+  cantidad       Int
+  precio_unitario Decimal  @db.Decimal(15, 2)
+  subtotal       Decimal  @db.Decimal(15, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  id_reserva Int
+  id_item    Int
+
+  Reserva EventoVentaReserva @relation(fields: [id_reserva], references: [id], name: "EventoVentaReservaItemReserva")
+  Item    EventoVentaItem    @relation(fields: [id_item], references: [id], name: "EventoVentaReservaItemItem")
+}
+
+model EventoVentaPago {
+  id               Int                    @id @default(autoincrement())
+  tipo_pago        TIPO_EVENTO_VENTA_PAGO
+  monto            Decimal                @db.Decimal(15, 2)
+  cuenta_destino   String?
+  observaciones    String?
+  fila_origen      Int?
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  id_reserva Int
+
+  Reserva EventoVentaReserva @relation(fields: [id_reserva], references: [id], name: "EventoVentaPagoReserva")
+
+  @@index([id_reserva, borrado])
+}
+
+model EventoVentaHojaImportada {
+  id             Int                    @id @default(autoincrement())
+  nombre_hoja    String
+  nombre_visible String
+  tipo_hoja      TIPO_EVENTO_VENTA_HOJA
+  orden          Int                    @default(0)
+  contenido      Json
+
+  borrado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  id_evento_venta Int
+
+  EventoVenta EventoVenta @relation(fields: [id_evento_venta], references: [id], name: "EventoVentaHojaImportadaEventoVenta")
+
+  @@index([id_evento_venta, borrado])
 }
 
 enum MODALIDAD_REUNION {
