@@ -11,7 +11,6 @@ import {
   Post,
   Query,
   Res,
-  Request,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -23,18 +22,18 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { AuthenticatedRequest } from '../auth/types/auth-request.types';
 import { CreateEventoVentaDto } from './dto/create-evento-venta.dto';
 import { CreateEventoVentaItemDto } from './dto/create-evento-venta-item.dto';
 import { CreateEventoVentaReservaDto } from './dto/create-evento-venta-reserva.dto';
 import { EventoVentaCostoItemDto } from './dto/evento-venta-costo-item.dto';
 import { EventosVentaQueryDto } from './dto/eventos-venta-query.dto';
+import { ManageEncargadoJuvenilEventoVentaDto } from './dto/manage-encargado-juvenil-evento-venta.dto';
 import { UpdateEventoVentaDto } from './dto/update-evento-venta.dto';
 import { UpdateEventoVentaItemDto } from './dto/update-evento-venta-item.dto';
 import { UpdateEventoVentaReservaDto } from './dto/update-evento-venta-reserva.dto';
 import { EventosVentaService } from './eventos-venta.service';
 
-const ADULT_ROLES = [
+const EVENTOS_VENTA_MANAGEMENT_ROLES = [
   'ADM',
   'AYUDANTE',
   'DEV',
@@ -43,6 +42,7 @@ const ADULT_ROLES = [
   'JEFATURA_RAMA',
   'AYUDANTE_RAMA',
   'INTENDENCIA',
+  'ENCARGADO_JUVENIL_EVENTOS_VENTA',
 ] as const;
 
 @Controller('eventos-venta')
@@ -52,15 +52,49 @@ export class EventosVentaController {
   @Get()
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('READ:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   async findAll(@Query() query: EventosVentaQueryDto) {
     return this.eventosVentaService.findAll(query);
+  }
+
+  @Get('meta/encargados-juveniles')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('UPDATE:EVENTO')
+  async listEncargadosJuveniles() {
+    return this.eventosVentaService.listEncargadosJuveniles();
+  }
+
+  @Get('meta/encargados-juveniles/options')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('UPDATE:EVENTO')
+  async getEncargadosJuvenilesOptions(@Query('q') query?: string) {
+    return this.eventosVentaService.getEncargadosJuvenilesOptions(query);
+  }
+
+  @Post('meta/encargados-juveniles')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('UPDATE:EVENTO')
+  async assignEncargadoJuvenil(
+    @Body() dto: ManageEncargadoJuvenilEventoVentaDto,
+  ) {
+    return this.eventosVentaService.assignEncargadoJuvenil(dto.idMiembro);
+  }
+
+  @Delete('meta/encargados-juveniles/:memberId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('UPDATE:EVENTO')
+  async removeEncargadoJuvenil(
+    @Param('memberId', ParseIntPipe) memberId: number,
+  ) {
+    await this.eventosVentaService.removeEncargadoJuvenil(memberId);
   }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('READ:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.eventosVentaService.findOne(id);
   }
@@ -68,12 +102,13 @@ export class EventosVentaController {
   @Get(':id/export')
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('READ:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   async exportSpreadsheet(
     @Param('id', ParseIntPipe) id: number,
     @Res() res: Response,
   ) {
-    const { buffer, fileName } = await this.eventosVentaService.exportSpreadsheet(id);
+    const { buffer, fileName } =
+      await this.eventosVentaService.exportSpreadsheet(id);
 
     res.set({
       'Content-Type':
@@ -89,17 +124,15 @@ export class EventosVentaController {
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('CREATE:EVENTO')
-  @Roles(...ADULT_ROLES)
-  async create(
-    @Body() dto: CreateEventoVentaDto,
-  ) {
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
+  async create(@Body() dto: CreateEventoVentaDto) {
     return this.eventosVentaService.create(dto);
   }
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('UPDATE:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateEventoVentaDto,
@@ -111,7 +144,7 @@ export class EventosVentaController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('DELETE:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   async remove(@Param('id', ParseIntPipe) id: number) {
     await this.eventosVentaService.remove(id);
   }
@@ -120,7 +153,7 @@ export class EventosVentaController {
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('UPDATE:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   async createItem(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreateEventoVentaItemDto,
@@ -131,7 +164,7 @@ export class EventosVentaController {
   @Patch(':id/items/:itemId')
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('UPDATE:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   async updateItem(
     @Param('id', ParseIntPipe) id: number,
     @Param('itemId', ParseIntPipe) itemId: number,
@@ -144,7 +177,7 @@ export class EventosVentaController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('UPDATE:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   async removeItem(
     @Param('id', ParseIntPipe) id: number,
     @Param('itemId', ParseIntPipe) itemId: number,
@@ -156,7 +189,7 @@ export class EventosVentaController {
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('UPDATE:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   async createCostoItem(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: EventoVentaCostoItemDto,
@@ -167,7 +200,7 @@ export class EventosVentaController {
   @Patch(':id/costos/:costoItemId')
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('UPDATE:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   async updateCostoItem(
     @Param('id', ParseIntPipe) id: number,
     @Param('costoItemId', ParseIntPipe) costoItemId: number,
@@ -180,7 +213,7 @@ export class EventosVentaController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('UPDATE:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   async removeCostoItem(
     @Param('id', ParseIntPipe) id: number,
     @Param('costoItemId', ParseIntPipe) costoItemId: number,
@@ -192,7 +225,7 @@ export class EventosVentaController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('UPDATE:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   @UseInterceptors(
     FileInterceptor('file', {
       limits: {
@@ -217,7 +250,7 @@ export class EventosVentaController {
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('UPDATE:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   async createReserva(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreateEventoVentaReservaDto,
@@ -228,7 +261,7 @@ export class EventosVentaController {
   @Patch(':id/reservas/:reservaId')
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('UPDATE:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   async updateReserva(
     @Param('id', ParseIntPipe) id: number,
     @Param('reservaId', ParseIntPipe) reservaId: number,
@@ -241,7 +274,7 @@ export class EventosVentaController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('UPDATE:EVENTO')
-  @Roles(...ADULT_ROLES)
+  @Roles(...EVENTOS_VENTA_MANAGEMENT_ROLES)
   async removeReserva(
     @Param('id', ParseIntPipe) id: number,
     @Param('reservaId', ParseIntPipe) reservaId: number,

@@ -15,6 +15,11 @@ import { UpdatePerfilFirmaDto } from './dto/update-perfil-firma.dto';
 
 @Injectable()
 export class PerfilesService {
+  private static readonly PRESERVED_DYNAMIC_ROLES = [
+    'REPRESENTANTE_JUVENIL',
+    'ENCARGADO_JUVENIL_EVENTOS_VENTA',
+  ] as const;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly scopeFilterService: ScopeFilterService,
@@ -545,7 +550,12 @@ export class PerfilesService {
     return this.prisma.$transaction(async (tx) => {
       // 1. Limpiar roles actuales que son automáticos
       // No borramos roles especiales como ADM, DEV, OWN que se asignan manualmente
-      const systemRoles = ['ADM', 'DEV', 'OWN'];
+      const systemRoles = [
+        'ADM',
+        'DEV',
+        'OWN',
+        ...PerfilesService.PRESERVED_DYNAMIC_ROLES,
+      ];
       await tx.cuentaRole.deleteMany({
         where: {
           id_cuenta: m.id_cuenta,

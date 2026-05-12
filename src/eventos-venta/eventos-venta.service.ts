@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import {
   Prisma,
+  SCOPE,
   TIPO_EVENTO_VENTA_HOJA,
   TIPO_EVENTO_VENTA_PAGO,
   TIPO_EVENTO_VENTA_SECTOR,
@@ -38,6 +39,9 @@ interface SectorSheetResolution {
   ramaId: number | null;
   areaId: number | null;
 }
+
+const ENCARGADO_JUVENIL_EVENTOS_VENTA_ROLE =
+  'ENCARGADO_JUVENIL_EVENTOS_VENTA';
 
 const normalizeText = (value: string) =>
   value
@@ -136,6 +140,175 @@ const toJsonValue = (value: unknown): Prisma.InputJsonValue => {
 @Injectable()
 export class EventosVentaService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async listEncargadosJuveniles() {
+    const assigned = await this.prisma.cuentaRole.findMany({
+      where: {
+        Role: {
+          nombre: ENCARGADO_JUVENIL_EVENTOS_VENTA_ROLE,
+        },
+        Cuenta: {
+          borrado: false,
+          Miembro: {
+            is: this.buildEncargadoJuvenilEligibleWhere(),
+          },
+        },
+      },
+      select: {
+        id_cuenta: true,
+        Cuenta: {
+          select: {
+            Miembro: {
+              select: this.encargadoJuvenilMemberSelect(),
+            },
+          },
+        },
+      },
+      orderBy: [
+        {
+          Cuenta: {
+            Miembro: {
+              apellidos: 'asc',
+            },
+          },
+        },
+        {
+          Cuenta: {
+            Miembro: {
+              nombre: 'asc',
+            },
+          },
+        },
+      ],
+    });
+
+    const seenMemberIds = new Set<number>();
+
+    return assigned
+      .map((item) => {
+        const miembro = item.Cuenta.Miembro;
+
+        if (!miembro || seenMemberIds.has(miembro.id)) {
+          return null;
+        }
+
+        seenMemberIds.add(miembro.id);
+
+        return this.mapEncargadoJuvenilMember(miembro, true);
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+  }
+
+  async getEncargadosJuvenilesOptions(query?: string) {
+    const search = query?.trim();
+    const miembros = await this.prisma.miembro.findMany({
+      where: {
+        ...this.buildEncargadoJuvenilEligibleWhere(),
+        ...(search
+          ? {
+              OR: [
+                {
+                  nombre: {
+                    contains: search,
+                    mode: Prisma.QueryMode.insensitive,
+                  },
+                },
+                {
+                  apellidos: {
+                    contains: search,
+                    mode: Prisma.QueryMode.insensitive,
+                  },
+                },
+                {
+                  dni: {
+                    contains: search,
+                    mode: Prisma.QueryMode.insensitive,
+                  },
+                },
+              ],
+            }
+          : {}),
+      },
+      select: this.encargadoJuvenilMemberSelect(),
+      orderBy: [{ apellidos: 'asc' }, { nombre: 'asc' }],
+    });
+
+    const assignedCuentaRoles = await this.prisma.cuentaRole.findMany({
+      where: {
+        Role: {
+          nombre: ENCARGADO_JUVENIL_EVENTOS_VENTA_ROLE,
+        },
+        id_cuenta: {
+          in: miembros.map((miembro) => miembro.id_cuenta),
+        },
+      },
+      select: {
+        id_cuenta: true,
+      },
+    });
+
+    const assignedCuentaIds = new Set(
+      assignedCuentaRoles.map((item) => item.id_cuenta),
+    );
+
+    return miembros.map((miembro) =>
+      this.mapEncargadoJuvenilMember(
+        miembro,
+        assignedCuentaIds.has(miembro.id_cuenta),
+      ),
+    );
+  }
+
+  async assignEncargadoJuvenil(memberId: number) {
+    const role = await this.ensureEncargadoJuvenilRole();
+    const miembro = await this.ensureEncargadoJuvenilEligibleMember(memberId);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.cuentaRole.deleteMany({
+        where: {
+          id_cuenta: miembro.id_cuenta,
+          id_role: role.id,
+        },
+      });
+
+      await tx.cuentaRole.create({
+        data: {
+          id_cuenta: miembro.id_cuenta,
+          id_role: role.id,
+          tipo_scope: SCOPE.GRUPO,
+          id_scope: null,
+        },
+      });
+    });
+
+    return this.mapEncargadoJuvenilMember(miembro, true);
+  }
+
+  async removeEncargadoJuvenil(memberId: number) {
+    const role = await this.ensureEncargadoJuvenilRole();
+
+    const miembro = await this.prisma.miembro.findFirst({
+      where: {
+        id: memberId,
+        borrado: false,
+      },
+      select: {
+        id: true,
+        id_cuenta: true,
+      },
+    });
+
+    if (!miembro) {
+      throw new NotFoundException('El miembro indicado no existe.');
+    }
+
+    await this.prisma.cuentaRole.deleteMany({
+      where: {
+        id_cuenta: miembro.id_cuenta,
+        id_role: role.id,
+      },
+    });
+  }
 
   async findAll(query: EventosVentaQueryDto) {
     const page = query.page ?? 1;
@@ -1520,6 +1693,120 @@ export class EventosVentaService {
         errors,
       };
     });
+  }
+
+  private encargadoJuvenilMemberSelect() {
+    return {
+      id: true,
+      id_cuenta: true,
+      nombre: true,
+      apellidos: true,
+      dni: true,
+      MiembroRama: {
+        where: {
+          borrado: false,
+          fecha_egreso: null,
+        },
+        select: {
+          Rama: {
+            select: {
+              id: true,
+              nombre: true,
+            },
+          },
+        },
+        orderBy: {
+          fecha_ingreso: 'desc',
+        },
+        take: 1,
+      },
+    } satisfies Prisma.MiembroSelect;
+  }
+
+  private mapEncargadoJuvenilMember(
+    miembro: {
+      id: number;
+      id_cuenta: number;
+      nombre: string;
+      apellidos: string;
+      dni: string;
+      MiembroRama: Array<{
+        Rama: {
+          id: number;
+          nombre: string;
+        };
+      }>;
+    },
+    alreadyAssigned: boolean,
+  ) {
+    return {
+      id: miembro.id,
+      nombre: miembro.nombre,
+      apellidos: miembro.apellidos,
+      dni: miembro.dni,
+      ramaActualNombre: miembro.MiembroRama[0]?.Rama.nombre ?? null,
+      alreadyAssigned,
+    };
+  }
+
+  private buildEncargadoJuvenilEligibleWhere(): Prisma.MiembroWhereInput {
+    return {
+      borrado: false,
+      Protagonista: {
+        is: {
+          borrado: false,
+          activo: true,
+        },
+      },
+      Cuenta: {
+        is: {
+          borrado: false,
+        },
+      },
+      MiembroRama: {
+        some: {
+          borrado: false,
+          fecha_egreso: null,
+        },
+      },
+    };
+  }
+
+  private async ensureEncargadoJuvenilRole() {
+    const role = await this.prisma.role.findUnique({
+      where: {
+        nombre: ENCARGADO_JUVENIL_EVENTOS_VENTA_ROLE,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!role) {
+      throw new NotFoundException(
+        'El rol de encargado juvenil de eventos de venta no está configurado en el sistema.',
+      );
+    }
+
+    return role;
+  }
+
+  private async ensureEncargadoJuvenilEligibleMember(memberId: number) {
+    const miembro = await this.prisma.miembro.findFirst({
+      where: {
+        id: memberId,
+        ...this.buildEncargadoJuvenilEligibleWhere(),
+      },
+      select: this.encargadoJuvenilMemberSelect(),
+    });
+
+    if (!miembro) {
+      throw new BadRequestException(
+        'El miembro indicado no es elegible como encargado juvenil de eventos de venta.',
+      );
+    }
+
+    return miembro;
   }
 
   private async ensureEventoVentaExists(id: number) {

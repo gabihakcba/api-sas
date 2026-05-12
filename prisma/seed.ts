@@ -1109,6 +1109,17 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
     ],
   },
   {
+    nombre: 'ENCARGADO_JUVENIL_EVENTOS_VENTA',
+    descripcion:
+      'Rol dinamico para protagonistas con acceso completo al modulo de eventos de venta.',
+    permissions: [
+      {
+        actions: CRUD_ACTIONS,
+        resources: [RESOURCE.EVENTO],
+      },
+    ],
+  },
+  {
     nombre: 'JEFATURA',
     descripcion:
       'Acceso total a las herramientas del sistema con capacidad de realizar modificaciones.',
