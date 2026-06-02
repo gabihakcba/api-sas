@@ -78,4 +78,5 @@ export class CreateEventoDto {
   @IsInt({ each: true })
   @Min(1, { each: true })
   ramaIds?: number[];
+
 }

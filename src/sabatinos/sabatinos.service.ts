@@ -85,6 +85,20 @@ export class SabatinosService {
           AreasAfectadas: {
             include: { Area: { select: { nombre: true } } },
           },
+          Evento: {
+            select: {
+              id: true,
+              nombre: true,
+              fecha_inicio: true,
+              fecha_fin: true,
+              TipoEvento: {
+                select: {
+                  id: true,
+                  nombre: true,
+                },
+              },
+            },
+          },
           _count: {
             select: { Actividades: true },
           },
@@ -179,6 +193,23 @@ export class SabatinosService {
         AreasAfectadas: {
           include: { Area: { select: { id: true, nombre: true } } },
         },
+        Evento: {
+          select: {
+            id: true,
+            nombre: true,
+            descripcion: true,
+            fecha_inicio: true,
+            fecha_fin: true,
+            lugar: true,
+            terminado: true,
+            TipoEvento: {
+              select: {
+                id: true,
+                nombre: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -190,12 +221,23 @@ export class SabatinosService {
   }
 
   async create(dto: CreateSabatinoDto) {
+    if (dto.idEvento !== undefined) {
+      await this.ensureEventoExists(dto.idEvento);
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const sabatino = await tx.sabatino.create({
         data: {
           titulo: dto.titulo,
           fecha_inicio: new Date(dto.fechaInicio),
           fecha_fin: new Date(dto.fechaFin),
+          ...(dto.idEvento !== undefined
+            ? {
+                Evento: {
+                  connect: { id: dto.idEvento },
+                },
+              }
+            : {}),
           Educadores: {
             create: dto.educadorIds?.map((id) => ({ id_adulto: id })),
           },
@@ -225,7 +267,10 @@ export class SabatinosService {
   }
 
   async update(id: number, dto: UpdateSabatinoDto, user: AuthenticatedUser) {
-    const existing = await this.findOne(id, user);
+    await this.findOne(id, user);
+    if (dto.idEvento !== undefined && dto.idEvento !== null) {
+      await this.ensureEventoExists(dto.idEvento);
+    }
 
     return this.prisma.$transaction(async (tx) => {
       if (dto.educadorIds) {
@@ -248,13 +293,25 @@ export class SabatinosService {
           where: { id_sabatino: id },
         });
       }
-
-      const updated = await tx.sabatino.update({
+      await tx.sabatino.update({
         where: { id },
         data: {
           titulo: dto.titulo,
           fecha_inicio: dto.fechaInicio ? new Date(dto.fechaInicio) : undefined,
           fecha_fin: dto.fechaFin ? new Date(dto.fechaFin) : undefined,
+          ...(dto.idEvento !== undefined
+            ? dto.idEvento === null
+              ? {
+                  Evento: {
+                    disconnect: true,
+                  },
+                }
+              : {
+                  Evento: {
+                    connect: { id: dto.idEvento },
+                  },
+                }
+            : {}),
           Educadores: dto.educadorIds
             ? {
                 create: dto.educadorIds.map((eid: number) => ({
@@ -289,7 +346,7 @@ export class SabatinosService {
         },
       });
 
-      return updated;
+      return this.findOne(id, user);
     });
   }
 
@@ -339,6 +396,21 @@ export class SabatinosService {
 
     return { success: true };
   }
+
+  private async ensureEventoExists(id: number) {
+    const evento = await this.prisma.evento.findFirst({
+      where: {
+        id,
+        borrado: false,
+      },
+      select: { id: true },
+    });
+
+    if (!evento) {
+      throw new NotFoundException('El evento indicado no existe.');
+    }
+  }
+
 
   async getOptions(user: AuthenticatedUser) {
     const [areas, ramas, adultos] = await Promise.all([

@@ -316,6 +316,7 @@ model Evento {
   AreaAfectada      AreaAfectada[]      @relation(name: "AreaAfectadaEvento")
   RamaAfectada      RamaAfectada[]      @relation(name: "RamaAfectadaEvento")
   InscripcionEvento InscripcionEvento[] @relation(name: "InscripcionEventoEvento")
+  Sabatino          Sabatino[]          @relation(name: "EventoSabatino")
   Pago              Pago[]              @relation(name: "PagoEvento")
 
   @@index([id_ciclo_programa])
@@ -1374,11 +1375,16 @@ model Sabatino {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  id_evento Int?
+
   // Relations
+  Evento       Evento? @relation(fields: [id_evento], references: [id], name: "EventoSabatino")
   Educadores ActividadEducadorSabatino[] @relation(name: "SabatinoEducador")
   Actividades ActividadSabatino[] @relation(name: "ActividadSabatinoSabatino")
   RamasAfectadas RamaAfectadaSabatino[] @relation(name: "RamaAfectadaSabatinoSabatino")
   AreasAfectadas AreaAfectadaSabatino[] @relation(name: "AreaAfectadaSabatinoSabatino")
+
+  @@index([id_evento, borrado])
 }
 
 model ActividadEducadorSabatino {

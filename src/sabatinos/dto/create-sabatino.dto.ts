@@ -1,9 +1,11 @@
 import {
   IsArray,
   IsDateString,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Min,
 } from 'class-validator';
 
 export class CreateSabatinoDto {
@@ -32,4 +34,10 @@ export class CreateSabatinoDto {
   @IsArray()
   @IsOptional()
   areaIds?: number[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  idEvento?: number;
+
 }

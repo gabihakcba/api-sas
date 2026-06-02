@@ -688,6 +688,17 @@ export class EventosService {
         where: { borrado: false },
         select: { id: true, nombre: true },
       },
+      Sabatino: {
+        where: {
+          borrado: false,
+        },
+        select: {
+          id: true,
+          titulo: true,
+          fecha_inicio: true,
+          fecha_fin: true,
+        },
+      },
       AreaAfectada: {
         select: { Area: { select: { id: true, nombre: true } } },
       },
