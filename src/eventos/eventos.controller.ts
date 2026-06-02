@@ -11,8 +11,10 @@ import {
   Post,
   Query,
   Request,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { CheckPermissions } from '../auth/decorators/permissions.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -76,6 +78,23 @@ export class EventosController {
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.eventosService.findOne(id, req.user!);
+  }
+
+  @Get(':id/export/pdf')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @CheckPermissions('READ:EVENTO')
+  async exportPdf(
+    @Request() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.eventosService.exportPdf(id, req.user!);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${pdf.filename}"`,
+    );
+    res.send(pdf.buffer);
   }
 
   @Post()

@@ -19,12 +19,19 @@ import { EventosQueryDto } from './dto/eventos-query.dto';
 import { UpdateEventoAfectacionesDto } from './dto/update-evento-afectaciones.dto';
 import { UpdateEventoInscripcionesDto } from './dto/update-evento-inscripciones.dto';
 import { UpdateEventoDto } from './dto/update-evento.dto';
+import { escapeHtml, renderHtmlToPdf } from '../common/pdf/render-html-to-pdf';
+import {
+  formatArgentinaDate,
+  formatArgentinaDateTime,
+} from '../common/utils/argentina-datetime.util';
+import { SabatinosService } from '../sabatinos/sabatinos.service';
 
 @Injectable()
 export class EventosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ciclosProgramaService: CiclosProgramaService,
+    private readonly sabatinosService: SabatinosService,
   ) {}
 
   async findAll(user: AuthenticatedUser, query: EventosQueryDto) {
@@ -234,6 +241,37 @@ export class EventosService {
     }
 
     return evento;
+  }
+
+  async exportPdf(id: number, user: AuthenticatedUser) {
+    const [evento, config] = await Promise.all([
+      this.findOne(id, user),
+      this.prisma.configuracionGrupo.findFirst({ where: { id: 1 } }),
+    ]);
+    const groupName = config?.nombre_grupo?.trim() || 'Grupo Scout';
+    const sabatinos = await Promise.all(
+      (evento.Sabatino ?? []).map((sabatino) =>
+        this.sabatinosService.findOne(sabatino.id, user),
+      ),
+    );
+
+    const html = this.buildEventoPdfHtml(
+      evento,
+      groupName,
+      sabatinos.map((sabatino) =>
+        this.sabatinosService.buildPdfHtmlFromSabatinoData(sabatino, groupName),
+      ),
+    );
+    const buffer = await renderHtmlToPdf(html);
+    const slug = `${evento.TipoEvento.nombre}-${evento.nombre}`
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    return {
+      filename: `${slug || `evento-${evento.id}`}.pdf`,
+      buffer,
+    };
   }
 
   async create(dto: CreateEventoDto, user: AuthenticatedUser) {
@@ -734,6 +772,173 @@ export class EventosService {
         },
       },
     } satisfies Prisma.EventoSelect;
+  }
+
+  private buildEventoPdfHtml(
+    evento: Awaited<ReturnType<EventosService['findOne']>>,
+    groupName: string,
+    sabatinoAnnexes: string[],
+  ) {
+    const comision = evento.Comision[0]?.nombre?.trim();
+    const inscripciones = [...(evento.InscripcionEvento ?? [])].sort((a, b) =>
+      `${a.Miembro.apellidos}, ${a.Miembro.nombre}`.localeCompare(
+        `${b.Miembro.apellidos}, ${b.Miembro.nombre}`,
+        'es',
+      ),
+    );
+
+    const inscripcionesHtml =
+      inscripciones.length > 0
+        ? inscripciones
+            .map(
+              (inscripcion) => `
+                <tr>
+                  <td>${escapeHtml(
+                    `${inscripcion.Miembro.apellidos}, ${inscripcion.Miembro.nombre}`,
+                  )}</td>
+                  <td>${escapeHtml(inscripcion.Miembro.dni || '-')}</td>
+                </tr>
+              `,
+            )
+            .join('')
+        : `
+          <tr>
+            <td colspan="2" class="empty">No hay inscripciones registradas.</td>
+          </tr>
+        `;
+
+    return `
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8" />
+        <style>
+          body { font-family: Helvetica, Arial, sans-serif; color: #111; font-size: 11px; line-height: 1.4; margin: 0; }
+          .document { padding: 14mm; }
+          .header { border-bottom: 1px solid #222; padding-bottom: 10px; margin-bottom: 18px; }
+          h1 { font-size: 22px; margin: 0 0 4px 0; }
+          h2 { font-size: 15px; margin: 0 0 8px 0; }
+          .subtitle { margin: 0; color: #555; }
+          .meta-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+          .meta-item { border: 1px solid #d6d6d6; padding: 8px; border-radius: 6px; }
+          .meta-label { display: block; font-size: 10px; text-transform: uppercase; color: #666; margin-bottom: 3px; }
+          .description { margin-top: 12px; white-space: pre-wrap; }
+          .section { margin-top: 22px; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #dcdcdc; padding: 8px; text-align: left; vertical-align: top; }
+          th { background: #f3f3f3; font-size: 10px; text-transform: uppercase; }
+          .empty { text-align: center; color: #666; }
+          .count { color: #666; font-size: 11px; margin-bottom: 8px; }
+          .page-break { page-break-before: always; break-before: page; }
+          .sabatino-annex { page: sabatino-landscape; break-before: page; page-break-before: always; }
+          .sabatino-annex .container { padding: 10mm; }
+          .sabatino-annex header { margin-bottom: 15px; border-bottom: 1px solid #000; padding-bottom: 8px; }
+          .sabatino-annex h1 { font-size: 18px; margin: 0 0 8px 0; }
+          .sabatino-annex .info-grid { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 10px; }
+          .sabatino-annex .info-item { min-width: 200px; }
+          .sabatino-annex .info-label { font-weight: bold; color: #000; }
+          .sabatino-annex table { width: 100%; border-collapse: collapse; margin-top: 5px; table-layout: fixed; }
+          .sabatino-annex th, .sabatino-annex td { border: 0.5pt solid #000; padding: 4px 3px; text-align: left; vertical-align: top; overflow: hidden; }
+          .sabatino-annex th { background-color: #eee; font-weight: bold; text-transform: uppercase; font-size: 9px; }
+          .sabatino-annex .detail-block { margin-top: 20px; border: 0.5pt solid #000; page-break-inside: avoid; }
+          .sabatino-annex .detail-header { background-color: #eee; color: #000; padding: 6px 10px; display: flex; align-items: center; border-bottom: 0.5pt solid #000; }
+          .sabatino-annex .detail-number { font-size: 14px; font-weight: bold; border: 1pt solid #000; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin-right: 10px; background: #fff; }
+          .sabatino-annex .detail-title { font-size: 12px; font-weight: bold; flex-grow: 1; }
+          .sabatino-annex .detail-meta { font-size: 9px; }
+          .sabatino-annex .detail-content { padding: 8px 10px; }
+          .sabatino-annex .detail-section { margin-bottom: 8px; }
+          .sabatino-annex .detail-section strong { display: block; text-decoration: underline; margin-bottom: 2px; }
+          .sabatino-annex p { margin: 0; white-space: pre-wrap; font-size: 10px; }
+          @page { size: A4; margin: 0; }
+          @page sabatino-landscape { size: A4 landscape; margin: 0; }
+        </style>
+      </head>
+      <body>
+        <div class="document">
+          <header class="header">
+            <h1>${escapeHtml(evento.nombre)}</h1>
+            <p class="subtitle">${escapeHtml(groupName)}</p>
+            <div class="meta-grid">
+              <div class="meta-item">
+                <span class="meta-label">Tipo</span>
+                <span>${escapeHtml(evento.TipoEvento.nombre)}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Inicio</span>
+                <span>${escapeHtml(
+                  formatArgentinaDateTime(new Date(evento.fecha_inicio)),
+                )}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Fin</span>
+                <span>${escapeHtml(
+                  formatArgentinaDateTime(new Date(evento.fecha_fin)),
+                )}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Lugar</span>
+                <span>${escapeHtml(evento.lugar?.trim() || '-')}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Estado</span>
+                <span>${escapeHtml(evento.terminado ? 'Terminado' : 'Activo')}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Costos</span>
+                <span>MP: ${escapeHtml(evento.costo_mp.toString())} | MA: ${escapeHtml(
+                  evento.costo_ma.toString(),
+                )} | Ayte: ${escapeHtml(evento.costo_ayudante.toString())}</span>
+              </div>
+              ${
+                comision
+                  ? `
+                    <div class="meta-item">
+                      <span class="meta-label">Comisión</span>
+                      <span>${escapeHtml(comision)}</span>
+                    </div>
+                  `
+                  : ''
+              }
+            </div>
+            <p class="description">${escapeHtml(
+              evento.descripcion?.trim() || 'Sin descripción cargada.',
+            )}</p>
+          </header>
+
+          <section class="section">
+            <h2>Inscripciones</h2>
+            <p class="count">${escapeHtml(
+              String(evento._count.InscripcionEvento),
+            )} inscripto(s)</p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Apellido y nombre</th>
+                  <th>DNI</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${inscripcionesHtml}
+              </tbody>
+            </table>
+          </section>
+        </div>
+        ${
+          sabatinoAnnexes.length > 0
+            ? sabatinoAnnexes
+                .map(
+                  (html) => `
+                    <section class="sabatino-annex">
+                      ${html.replace(/<!DOCTYPE html>[\s\S]*?<body>/i, '').replace(/<\/body>[\s\S]*$/i, '')}
+                    </section>
+                  `,
+                )
+                .join('')
+            : ''
+        }
+      </body>
+      </html>
+    `;
   }
 
   private async findOneWithinClient(

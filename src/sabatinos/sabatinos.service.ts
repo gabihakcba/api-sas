@@ -455,7 +455,15 @@ export class SabatinosService {
     ]);
 
     const groupName = config?.nombre_grupo?.trim() || 'Grupo Scout';
+    const html = this.buildPdfHtmlFromSabatinoData(sabatino, groupName);
 
+    return renderHtmlToPdf(html);
+  }
+
+  buildPdfHtmlFromSabatinoData(
+    sabatino: Awaited<ReturnType<SabatinosService['findOne']>>,
+    groupName: string,
+  ) {
     const educadores = sabatino.Educadores.map(
       (e) => `${e.Adulto.Miembro.apellidos}, ${e.Adulto.Miembro.nombre}`,
     ).join(', ');
@@ -559,7 +567,7 @@ export class SabatinosService {
       })
       .join('');
 
-    const html = `
+    return `
       <!DOCTYPE html>
       <html lang="es">
       <head>
@@ -647,7 +655,5 @@ export class SabatinosService {
       </body>
       </html>
     `;
-
-    return renderHtmlToPdf(html);
   }
 }
