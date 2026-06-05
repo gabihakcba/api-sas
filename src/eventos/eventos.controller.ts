@@ -155,6 +155,32 @@ export class EventosController {
     return this.eventosService.updateInscripciones(id, dto, req.user!);
   }
 
+  @Patch(':id/inscripciones/:inscripcionId/asistencia')
+  @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
+  @CheckPermissions('UPDATE:INSCRIPCION')
+  @Roles(...ADULT_ROLES)
+  async updateInscripcionAsistencia(
+    @Request() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('inscripcionId', ParseIntPipe) inscripcionId: number,
+    @Body('asistio') asistio: boolean,
+  ) {
+    return this.eventosService.updateInscripcionAsistencia(id, inscripcionId, asistio, req.user!);
+  }
+
+  @Patch(':id/inscripciones/:inscripcionId/pagado')
+  @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
+  @CheckPermissions('UPDATE:INSCRIPCION')
+  @Roles(...ADULT_ROLES)
+  async updateInscripcionPagado(
+    @Request() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('inscripcionId', ParseIntPipe) inscripcionId: number,
+    @Body('pagado') pagado: boolean,
+  ) {
+    return this.eventosService.updateInscripcionPagado(id, inscripcionId, pagado, req.user!);
+  }
+
   @Patch(':id/afectaciones')
   @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
   @CheckPermissions('UPDATE:EVENTO')

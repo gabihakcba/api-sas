@@ -24,6 +24,7 @@ import { CreateSabatinoDto } from './dto/create-sabatino.dto';
 import { SabatinosQueryDto } from './dto/sabatinos-query.dto';
 import { UpdateSabatinoActividadesDto } from './dto/update-sabatino-actividades.dto';
 import { UpdateSabatinoDto } from './dto/update-sabatino.dto';
+import { SaveAsistenciaSabatinoDto } from './dto/save-asistencia-sabatino.dto';
 import { SabatinosService } from './sabatinos.service';
 
 @Controller('sabatinos')
@@ -97,6 +98,25 @@ export class SabatinosController {
     });
 
     res.end(buffer);
+  }
+
+  @Get(':id/asistencia')
+  @CheckPermissions(`${ACTION.READ}:${RESOURCE.ASISTENCIA}`)
+  async getAsistencia(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.sabatinosService.getAsistencia(id, req.user!);
+  }
+
+  @Post(':id/asistencia')
+  @CheckPermissions(`${ACTION.UPDATE}:${RESOURCE.ASISTENCIA}`)
+  async saveAsistencia(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: SaveAsistenciaSabatinoDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.sabatinosService.saveAsistencia(id, dto, req.user!);
   }
 
   @Delete(':id')

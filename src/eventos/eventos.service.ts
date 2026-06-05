@@ -510,6 +510,62 @@ export class EventosService {
     return this.getInscripciones(id, user);
   }
 
+  async updateInscripcionAsistencia(
+    eventId: number,
+    inscripcionId: number,
+    asistio: boolean,
+    user: AuthenticatedUser,
+  ) {
+    await this.ensureEventoExists(eventId, user);
+
+    const inscripcion = await this.prisma.inscripcionEvento.findFirst({
+      where: {
+        id: inscripcionId,
+        id_evento: eventId,
+        borrado: false,
+      },
+    });
+
+    if (!inscripcion) {
+      throw new NotFoundException('La inscripción indicada no existe.');
+    }
+
+    await this.prisma.inscripcionEvento.update({
+      where: { id: inscripcionId },
+      data: { asistio },
+    });
+
+    return { success: true };
+  }
+
+  async updateInscripcionPagado(
+    eventId: number,
+    inscripcionId: number,
+    pagado: boolean,
+    user: AuthenticatedUser,
+  ) {
+    await this.ensureEventoExists(eventId, user);
+
+    const inscripcion = await this.prisma.inscripcionEvento.findFirst({
+      where: {
+        id: inscripcionId,
+        id_evento: eventId,
+        borrado: false,
+      },
+    });
+
+    if (!inscripcion) {
+      throw new NotFoundException('La inscripción indicada no existe.');
+    }
+
+    await this.prisma.inscripcionEvento.update({
+      where: { id: inscripcionId },
+      data: { pagado },
+    });
+
+    return { success: true };
+  }
+
   async updateAfectaciones(
     id: number,
     dto: UpdateEventoAfectacionesDto,
@@ -761,6 +817,8 @@ export class EventosService {
         where: { borrado: false },
         select: {
           id: true,
+          asistio: true,
+          pagado: true,
           Miembro: {
             select: {
               id: true,

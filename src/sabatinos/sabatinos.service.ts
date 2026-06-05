@@ -2,16 +2,21 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeFilterService } from '../auth/services/scope-filter.service';
 import { AuthenticatedUser } from '../auth/types/auth-request.types';
-import { hasSoftDeleteAuditAccess } from '../auth/utils/unrestricted-access.util';
+import {
+  hasSoftDeleteAuditAccess,
+  hasUnrestrictedAccess,
+} from '../auth/utils/unrestricted-access.util';
 import { SabatinosQueryDto } from './dto/sabatinos-query.dto';
 import { CreateSabatinoDto } from './dto/create-sabatino.dto';
 import { UpdateSabatinoDto } from './dto/update-sabatino.dto';
 import { UpdateSabatinoActividadesDto } from './dto/update-sabatino-actividades.dto';
+import { SaveAsistenciaSabatinoDto } from './dto/save-asistencia-sabatino.dto';
 import { renderHtmlToPdf, escapeHtml } from '../common/pdf/render-html-to-pdf';
 import {
   formatArgentinaDateTime,
@@ -655,5 +660,193 @@ export class SabatinosService {
       </body>
       </html>
     `;
+  }
+
+  async getAsistencia(sabatinoId: number, user: AuthenticatedUser) {
+    const sabatino = await this.prisma.sabatino.findFirst({
+      where: { id: sabatinoId, borrado: false },
+      include: {
+        RamasAfectadas: true,
+      },
+    });
+
+    if (!sabatino) {
+      throw new NotFoundException('El sabatino indicado no existe.');
+    }
+
+    const sabatinoBranchIds = sabatino.RamasAfectadas.map((r) => r.id_rama);
+    let allowedBranchIds: number[] = [];
+
+    if (hasUnrestrictedAccess(user)) {
+      allowedBranchIds = sabatinoBranchIds;
+    } else {
+      const userRamaIds = user.scopes
+        .filter((s) => s.scopeType === 'RAMA' && s.scopeId != null)
+        .map((s) => s.scopeId as number);
+      allowedBranchIds = sabatinoBranchIds.filter((id) => userRamaIds.includes(id));
+    }
+
+    if (allowedBranchIds.length === 0) {
+      throw new ForbiddenException(
+        'No tiene permisos para ver o gestionar asistencia en este sabatino ya que no pertenece a ninguna de las ramas afectadas.',
+      );
+    }
+
+    const protagonistas = await this.prisma.protagonista.findMany({
+      where: {
+        borrado: false,
+        activo: true,
+        Miembro: {
+          borrado: false,
+          MiembroRama: {
+            some: {
+              id_rama: { in: allowedBranchIds },
+              fecha_egreso: null,
+              borrado: false,
+            },
+          },
+        },
+      },
+      include: {
+        Miembro: {
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+            dni: true,
+            MiembroRama: {
+              where: {
+                fecha_egreso: null,
+                borrado: false,
+              },
+              select: {
+                id_rama: true,
+                Rama: {
+                  select: {
+                    id: true,
+                    nombre: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const asistencias = await this.prisma.asistenciaSabatino.findMany({
+      where: {
+        id_sabatino: sabatinoId,
+        borrado: false,
+      },
+    });
+
+    return protagonistas.map((p) => {
+      const miembro = p.Miembro;
+      const activeRamaRelation = miembro.MiembroRama[0];
+      const asistenciaRecord = asistencias.find((a) => a.id_miembro === miembro.id);
+      return {
+        idMiembro: miembro.id,
+        nombre: miembro.nombre,
+        apellidos: miembro.apellidos,
+        dni: miembro.dni,
+        idRama: activeRamaRelation?.id_rama ?? null,
+        nombreRama: activeRamaRelation?.Rama?.nombre ?? null,
+        asistio: asistenciaRecord ? asistenciaRecord.asistio : false,
+      };
+    });
+  }
+
+  async saveAsistencia(
+    sabatinoId: number,
+    dto: SaveAsistenciaSabatinoDto,
+    user: AuthenticatedUser,
+  ) {
+    const sabatino = await this.prisma.sabatino.findFirst({
+      where: { id: sabatinoId, borrado: false },
+      include: {
+        RamasAfectadas: true,
+      },
+    });
+
+    if (!sabatino) {
+      throw new NotFoundException('El sabatino indicado no existe.');
+    }
+
+    const sabatinoBranchIds = sabatino.RamasAfectadas.map((r) => r.id_rama);
+    let allowedBranchIds: number[] = [];
+
+    if (hasUnrestrictedAccess(user)) {
+      allowedBranchIds = sabatinoBranchIds;
+    } else {
+      const userRamaIds = user.scopes
+        .filter((s) => s.scopeType === 'RAMA' && s.scopeId != null)
+        .map((s) => s.scopeId as number);
+      allowedBranchIds = sabatinoBranchIds.filter((id) => userRamaIds.includes(id));
+    }
+
+    if (allowedBranchIds.length === 0) {
+      throw new ForbiddenException(
+        'No tiene permisos para registrar asistencia en las ramas de este sabatino.',
+      );
+    }
+
+    if (dto.asistencias.length > 0) {
+      const validProtagonistas = await this.prisma.protagonista.findMany({
+        where: {
+          borrado: false,
+          activo: true,
+          Miembro: {
+            id: { in: dto.asistencias.map((a) => a.idMiembro) },
+            borrado: false,
+            MiembroRama: {
+              some: {
+                id_rama: { in: allowedBranchIds },
+                fecha_egreso: null,
+                borrado: false,
+              },
+            },
+          },
+        },
+        select: {
+          id_miembro: true,
+        },
+      });
+
+      const validMiembroIds = new Set(validProtagonistas.map((p) => p.id_miembro));
+
+      for (const item of dto.asistencias) {
+        if (!validMiembroIds.has(item.idMiembro)) {
+          throw new BadRequestException(
+            `El miembro con ID ${item.idMiembro} no es un protagonista activo asignado a una de sus ramas permitidas para este sabatino.`,
+          );
+        }
+      }
+
+      await this.prisma.$transaction(
+        dto.asistencias.map((item) =>
+          this.prisma.asistenciaSabatino.upsert({
+            where: {
+              id_sabatino_id_miembro: {
+                id_sabatino: sabatinoId,
+                id_miembro: item.idMiembro,
+              },
+            },
+            create: {
+              id_sabatino: sabatinoId,
+              id_miembro: item.idMiembro,
+              asistio: item.asistio,
+              borrado: false,
+            },
+            update: {
+              asistio: item.asistio,
+              borrado: false,
+            },
+          }),
+        ),
+      );
+    }
+
+    return { success: true };
   }
 }

@@ -78,6 +78,7 @@ model Miembro {
   ConsejoProsecretaria  Consejo[]               @relation(name: "ConsejoProsecretario")
   InvitadoReunion       InvitadoReunion[]       @relation(name: "MiembroInvitadoReunion")
   EventoVentaReserva   EventoVentaReserva[]    @relation(name: "EventoVentaReservaVendedor")
+  AsistenciasSabatino  AsistenciaSabatino[]    @relation(name: "MiembroAsistenciaSabatino")
 }
 
 model Protagonista {
@@ -1383,8 +1384,28 @@ model Sabatino {
   Actividades ActividadSabatino[] @relation(name: "ActividadSabatinoSabatino")
   RamasAfectadas RamaAfectadaSabatino[] @relation(name: "RamaAfectadaSabatinoSabatino")
   AreasAfectadas AreaAfectadaSabatino[] @relation(name: "AreaAfectadaSabatinoSabatino")
+  Asistencias  AsistenciaSabatino[]    @relation(name: "SabatinoAsistencia")
 
   @@index([id_evento, borrado])
+}
+
+model AsistenciaSabatino {
+  id          Int      @id @default(autoincrement())
+  asistio     Boolean  @default(true)
+  borrado     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  id_sabatino Int
+  id_miembro  Int
+
+  // Relations
+  Sabatino Sabatino @relation(fields: [id_sabatino], references: [id], name: "SabatinoAsistencia", onDelete: Cascade)
+  Miembro  Miembro  @relation(fields: [id_miembro], references: [id], name: "MiembroAsistenciaSabatino", onDelete: Cascade)
+
+  @@unique([id_sabatino, id_miembro])
+  @@index([id_miembro])
+  @@index([id_sabatino, borrado])
 }
 
 model ActividadEducadorSabatino {
