@@ -11,6 +11,18 @@ import {
 export class UpdatePerfilPersonalDto {
   @IsOptional()
   @IsString()
+  @MinLength(3)
+  @MaxLength(50)
+  user?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(100)
+  password?: string;
+
+  @IsOptional()
+  @IsString()
   @MinLength(1)
   @MaxLength(120)
   nombre?: string;

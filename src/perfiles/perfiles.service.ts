@@ -60,6 +60,8 @@ export class PerfilesService {
           miembroId: miembro.id,
         },
         {
+          ...(dto.user !== undefined ? { user: dto.user.trim() } : {}),
+          ...(dto.password ? { password: dto.password } : {}),
           ...(dto.nombre !== undefined ? { nombre: dto.nombre.trim() } : {}),
           ...(dto.apellidos !== undefined
             ? { apellidos: dto.apellidos.trim() }
